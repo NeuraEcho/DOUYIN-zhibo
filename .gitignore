@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# 虚拟环境
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 环境变量（包含密钥，不提交）
+.env
+
+# 日志
+logs/
+*.log
+
+# LangGraph Checkpoints
+checkpoints/
+
+# 测试
+.pytest_cache/
+htmlcov/
+.coverage
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 运行时数据（克隆音色 / 商品知识库等，各账号不同，不提交）
+data/*.json
+
+# 生成产物
+output/
+
+# 临时调试脚本
+_test_*.py

@@ -1,0 +1,1254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 云端口播直播系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .tab-active { border-bottom: 2px solid #3b82f6; color: #3b82f6; font-weight: 600; }
+        .fade-in { animation: fadeIn 0.3s ease-in; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .pulse-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        .pulse-dot.live { background: #22c55e; animation: pulse 1.5s infinite; }
+        .pulse-dot.idle { background: #9ca3af; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+    <!-- 顶栏 -->
+    <header class="bg-white shadow-sm border-b">
+        <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center text-white font-bold text-sm">AI</div>
+                <h1 class="text-lg font-semibold text-gray-800">云端口播直播系统</h1>
+            </div>
+            <div class="flex items-center gap-2 text-sm">
+                <span id="statusDot" class="pulse-dot idle"></span>
+                <span id="statusText" class="text-gray-500">空闲</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Tab 导航 -->
+    <div class="max-w-6xl mx-auto px-4 mt-4">
+        <div class="flex gap-6 border-b">
+            <button onclick="switchTab('control')" id="tab-control" class="tab-btn pb-2 px-1 text-sm text-gray-600 hover:text-blue-500 tab-active">直播控制</button>
+            <button onclick="switchTab('preview')" id="tab-preview" class="tab-btn pb-2 px-1 text-sm text-gray-600 hover:text-blue-500">试听试播</button>
+            <button onclick="switchTab('voice')" id="tab-voice" class="tab-btn pb-2 px-1 text-sm text-gray-600 hover:text-blue-500">音色克隆</button>
+            <button onclick="switchTab('config')" id="tab-config" class="tab-btn pb-2 px-1 text-sm text-gray-600 hover:text-blue-500">配置管理</button>
+            <button onclick="switchTab('monitor')" id="tab-monitor" class="tab-btn pb-2 px-1 text-sm text-gray-600 hover:text-blue-500">监控</button>
+        </div>
+    </div>
+
+    <!-- 主内容区 -->
+    <main class="max-w-6xl mx-auto px-4 py-6">
+
+        <!-- ===== 直播控制 ===== -->
+        <div id="panel-control" class="tab-panel fade-in">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- 启动/停止 -->
+                <div class="bg-white rounded-xl shadow-sm border p-5">
+                    <h2 class="text-sm font-semibold text-gray-700 mb-4">直播控制</h2>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">会话 ID</label>
+                            <input id="threadId" type="text" value="live-session-01" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-200 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">运行模式</label>
+                            <select id="runMode" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-200 outline-none">
+                                <option value="script_auto">脚本自动口播</option>
+                                <option value="danmaku_reply">弹幕互动回复</option>
+                            </select>
+                        </div>
+                        <div class="flex gap-2 pt-2">
+                            <button onclick="startLive()" class="flex-1 bg-green-500 hover:bg-green-600 text-white text-sm font-medium py-2 rounded-lg transition">启动直播</button>
+                            <button onclick="stopLive()" class="flex-1 bg-red-500 hover:bg-red-600 text-white text-sm font-medium py-2 rounded-lg transition">停止直播</button>
+                        </div>
+                        <button onclick="interruptLive()" class="w-full bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium py-2 rounded-lg transition">打断当前播报</button>
+                    </div>
+                </div>
+
+                <!-- 手动下发话术 -->
+                <div class="bg-white rounded-xl shadow-sm border p-5">
+                    <h2 class="text-sm font-semibold text-gray-700 mb-4">手动下发话术</h2>
+                    <textarea id="manualText" rows="5" placeholder="输入要播报的文字内容..." class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-200 outline-none resize-none"></textarea>
+                    <button onclick="manualInput()" class="w-full mt-3 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium py-2 rounded-lg transition">发送播报</button>
+                </div>
+            </div>
+
+            <!-- 循环口播 -->
+            <div class="mt-6 bg-white rounded-xl shadow-sm border p-5">
+                <h2 class="text-sm font-semibold text-gray-700 mb-2">🔁 循环口播</h2>
+                <p class="text-xs text-gray-400 mb-3">手动开始后，稿子直读（不经 AI 改写）并无限循环播放，直到手动停止；播报中若有弹幕提问，AI 会在句尾插入回答后继续循环。</p>
+                <div class="bg-amber-50 border border-amber-200 rounded-lg p-2 mb-3">
+                    <p class="text-[11px] text-amber-700 leading-relaxed">🔊 声音从<b>虚拟声卡</b>输出（需安装 VB-Audio Virtual Cable 并设为系统默认播放设备）；每遍之间的停顿秒数可在「配置管理 → 循环口播间隔」调整。</p>
+                </div>
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-2 mb-3">
+                    <p class="text-[11px] text-blue-700 leading-relaxed">👤 稿子里写 <code class="bg-white px-1 rounded">{点名}</code> 可随机点名最近互动的观众，自动念成「xx姐姐」；弹幕提问时 AI 也会带上观众昵称回答。昵称过长取前 2 字，英文/符号/表情开头分别念「这位英文/符号/表情姐姐」。</p>
+                </div>
+                <textarea id="loopScript" rows="5" placeholder="输入要循环播放的口播稿...（可用 {点名} 随机点名互动观众）" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-200 outline-none resize-none"></textarea>
+                <div class="flex gap-2 mt-3">
+                    <button onclick="loopStart()" id="btnLoopStart" class="flex-1 bg-green-500 hover:bg-green-600 text-white text-sm font-medium py-2 rounded-lg transition">开始循环口播</button>
+                    <button onclick="loopStop()" id="btnLoopStop" class="flex-1 bg-red-500 hover:bg-red-600 text-white text-sm font-medium py-2 rounded-lg transition">停止循环</button>
+                </div>
+                <div id="loopStatus" class="text-xs text-gray-400 mt-2"></div>
+            </div>
+        </div>
+
+        <!-- ===== 试听试播 ===== -->
+        <div id="panel-preview" class="tab-panel hidden fade-in">
+            <!-- TTS 提供商提示条 -->
+            <div id="previewProviderHint" class="mb-4 rounded-lg p-3 text-sm font-medium hidden"></div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- 话术试听 -->
+                <div class="bg-white rounded-xl shadow-sm border p-5">
+                    <h2 class="text-sm font-semibold text-gray-700 mb-4">🎧 话术试听</h2>
+                    <p class="text-xs text-gray-400 mb-3">输入文本，选择音色，试听 TTS 合成效果</p>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">试听文本</label>
+                            <textarea id="previewTtsText" rows="4" placeholder="输入要试听的话术内容..." class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-200 outline-none resize-none"></textarea>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">音色选择</label>
+                            <select id="previewTtsVoice" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-200 outline-none">
+                                <option value="">默认音色</option>
+                            </select>
+                        </div>
+                        <div id="enrichGroup-preview" class="flex items-center gap-2">
+                            <input type="checkbox" id="previewTtsEnrich" checked class="rounded">
+                            <label for="previewTtsEnrich" class="text-xs text-gray-500">🗣️ 口语化标注（添加停顿/语气词/情感）</label>
+                        </div>
+                        <button onclick="previewTTS()" id="btnPreviewTts" class="w-full bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-medium py-2 rounded-lg transition">合成试听</button>
+                        <audio id="previewTtsAudio" controls class="w-full hidden"></audio>
+                        <div id="previewTtsStatus" class="text-xs text-gray-400"></div>
+                    </div>
+                </div>
+
+                <!-- 试播模式 -->
+                <div class="bg-white rounded-xl shadow-sm border p-5">
+                    <h2 class="text-sm font-semibold text-gray-700 mb-4">🎙️ 试播模式</h2>
+                    <p class="text-xs text-gray-400 mb-3">输入完整脚本，走真实直播会话「稿子直读」播报</p>
+                    <div class="bg-amber-50 border border-amber-200 rounded-lg p-2 mb-3">
+                        <p class="text-[11px] text-amber-700 leading-relaxed">🔊 声音从<b>虚拟声卡</b>输出（需安装 VB-Audio Virtual Cable），浏览器不再播放；可被「模拟弹幕提问」自动打断并由 AI 承接口播。口语化/情绪由当前 TTS 服务商自动处理。</p>
+                    </div>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">脚本文本</label>
+                            <textarea id="testBroadcastScript" rows="4" placeholder="输入完整的直播脚本内容..." class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-200 outline-none resize-none"></textarea>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">音色选择</label>
+                            <select id="testBroadcastVoice" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-200 outline-none">
+                                <option value="">默认音色</option>
+                            </select>
+                        </div>
+                        <button onclick="testBroadcast()" id="btnTestBroadcast" class="w-full bg-teal-500 hover:bg-teal-600 text-white text-sm font-medium py-2 rounded-lg transition">开始试播</button>
+                        <div id="testBroadcastStatus" class="text-xs text-gray-400"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 模拟弹幕提问 -->
+            <div class="mt-6 bg-white rounded-xl shadow-sm border p-5">
+                <h2 class="text-sm font-semibold text-gray-700 mb-4">💬 模拟弹幕提问</h2>
+                <p class="text-xs text-gray-400 mb-3">模拟观众提问，走真实直播会话由 AI 回复</p>
+                <div class="bg-amber-50 border border-amber-200 rounded-lg p-2 mb-3">
+                    <p class="text-[11px] text-amber-700 leading-relaxed">⚡ 若试播正在播报，发送提问会<b>自动打断</b>它，AI 先口语化承接口播（如“稍等哈，先回答下这位朋友”）再回答；声音从虚拟声卡输出，回复文本显示在右侧。</p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">模拟提问内容</label>
+                            <textarea id="simDanmakuQuestion" rows="3" placeholder="例如：这个产品多少钱？能用多久？" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-200 outline-none resize-none"></textarea>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">观众昵称（可选）</label>
+                            <input id="simDanmakuNickname" type="text" placeholder="留空则兜底称呼「用户姐姐」" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-200 outline-none">
+                            <p class="text-[11px] text-gray-400 mt-1">AI 回答会称呼「xx姐姐」：过长取前 2 字，英文/符号/表情开头念「这位英文/符号/表情姐姐」。</p>
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">音色选择</label>
+                            <select id="simDanmakuVoice" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-200 outline-none">
+                                <option value="">默认音色</option>
+                            </select>
+                        </div>
+                        <button onclick="simulateDanmaku()" id="btnSimDanmaku" class="w-full bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium py-2 rounded-lg transition">发送提问</button>
+                    </div>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">AI 回复</label>
+                            <div id="simDanmakuReply" class="bg-gray-50 rounded-lg p-3 text-sm text-gray-700 min-h-[100px] max-h-[200px] overflow-y-auto">
+                                <span class="text-gray-400">等待提问...</span>
+                            </div>
+                        </div>
+                        <div id="simDanmakuStatus" class="text-xs text-gray-400"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== 音色克隆 ===== -->
+        <div id="panel-voice" class="tab-panel hidden fade-in">
+            <!-- 火山引擎提示：音色克隆仅 MiniMax 支持 -->
+            <div id="voiceProviderHint" class="mb-4 rounded-lg p-3 text-sm font-medium hidden"></div>
+            <div id="voiceCloneContent">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- 上传 & 克隆 -->
+                <div class="bg-white rounded-xl shadow-sm border p-5">
+                    <h2 class="text-sm font-semibold text-gray-700 mb-2">克隆新音色</h2>
+                    <div class="bg-blue-50 rounded-lg p-3 mb-4">
+                        <p class="text-xs text-blue-600">🎤 提升建议: 参考音频 30s+ 纯人声、无背景噪音、语速自然</p>
+                    </div>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">音色名称</label>
+                            <input id="voiceName" type="text" placeholder="例如：我的声音" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-200 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">参考音频（10s~5min，mp3/m4a/wav，≤20MB）</label>
+                            <input id="cloneAudio" type="file" accept=".mp3,.m4a,.wav" class="w-full text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-blue-50 file:text-blue-600 hover:file:bg-blue-100">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">示例音频（可选，<8s，增强克隆效果）</label>
+                            <input id="promptAudio" type="file" accept=".mp3,.m4a,.wav" class="w-full text-sm text-gray-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-gray-50 file:text-gray-600 hover:file:bg-gray-100">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-gray-500 mb-1">试听文本（可选）</label>
+                            <input id="previewText" type="text" placeholder="用于生成试听音频的文本" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-200 outline-none">
+                        </div>
+                        <!-- 克隆选项 -->
+                        <div class="border-t pt-3">
+                            <p class="text-xs text-gray-500 mb-2 font-medium">克隆选项</p>
+                            <div class="grid grid-cols-2 gap-2">
+                                <label class="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                                    <input id="optHD" type="checkbox" checked class="w-3.5 h-3.5 text-purple-500 rounded">
+                                    <span>高质量模型 (HD)</span>
+                                </label>
+                                <label class="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                                    <input id="optNoise" type="checkbox" checked class="w-3.5 h-3.5 text-purple-500 rounded">
+                                    <span>降噪</span>
+                                </label>
+                                <label class="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                                    <input id="optNorm" type="checkbox" checked class="w-3.5 h-3.5 text-purple-500 rounded">
+                                    <span>音量归一化</span>
+                                </label>
+                                <label class="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                                    <input id="optBoost" type="checkbox" checked class="w-3.5 h-3.5 text-purple-500 rounded">
+                                    <span>中文语言增强</span>
+                                </label>
+                            </div>
+                        </div>
+                        <button onclick="cloneVoice()" class="w-full bg-purple-500 hover:bg-purple-600 text-white text-sm font-medium py-2 rounded-lg transition">上传并克隆</button>
+                    </div>
+                    <div id="cloneResult" class="mt-3 text-xs text-gray-500"></div>
+                </div>
+
+                <!-- 音色列表 -->
+                <div class="bg-white rounded-xl shadow-sm border p-5">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-sm font-semibold text-gray-700">已克隆音色</h2>
+                        <button onclick="loadVoices()" class="text-xs text-blue-500 hover:text-blue-700">刷新</button>
+                    </div>
+                    <div id="voiceList" class="space-y-2 max-h-80 overflow-y-auto">
+                        <p class="text-xs text-gray-400 text-center py-4">暂无克隆音色</p>
+                    </div>
+                </div>
+            </div>
+            </div>
+
+            <!-- 火山引擎声音复刻音色管理 -->
+            <div id="volcCloneContent" class="hidden">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <!-- 查询/注册复刻音色 -->
+                    <div class="bg-white rounded-xl shadow-sm border p-5">
+                        <h2 class="text-sm font-semibold text-gray-700 mb-2">🔥 复刻音色查询</h2>
+                        <div class="bg-orange-50 rounded-lg p-3 mb-4">
+                            <p class="text-xs text-orange-600 leading-relaxed">声音复刻需先在<b>火山引擎控制台</b>下单并训练音色，获取 <b>speaker_id</b>（S_ 开头）。在此输入 speaker_id 查询训练状态，成功后即可加入列表并用于合成。</p>
+                        </div>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">Speaker ID（S_ 开头）</label>
+                                <input id="volcSpeakerId" type="text" placeholder="例如：S_RA8zxove2" class="w-full border rounded-lg px-3 py-2 text-sm font-mono focus:ring-2 focus:ring-orange-200 outline-none">
+                            </div>
+                            <div>
+                                <label class="block text-xs text-gray-500 mb-1">显示名称（可选）</label>
+                                <input id="volcVoiceName" type="text" placeholder="例如：我的复刻音色" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-orange-200 outline-none">
+                            </div>
+                            <button onclick="queryVolcVoice()" id="btnQueryVolc" class="w-full bg-orange-500 hover:bg-orange-600 text-white text-sm font-medium py-2 rounded-lg transition">查询并添加</button>
+                            <div id="volcQueryResult" class="text-xs text-gray-500"></div>
+                        </div>
+                    </div>
+
+                    <!-- 复刻音色列表 -->
+                    <div class="bg-white rounded-xl shadow-sm border p-5">
+                        <div class="flex items-center justify-between mb-4">
+                            <h2 class="text-sm font-semibold text-gray-700">已注册复刻音色</h2>
+                            <div class="flex gap-3">
+                                <button onclick="refreshVolcVoices()" class="text-xs text-orange-500 hover:text-orange-700">刷新状态</button>
+                                <button onclick="loadVolcVoices()" class="text-xs text-blue-500 hover:text-blue-700">重载</button>
+                            </div>
+                        </div>
+                        <div id="volcVoiceList" class="space-y-2 max-h-96 overflow-y-auto">
+                            <p class="text-xs text-gray-400 text-center py-4">暂无复刻音色</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ===== 配置管理 ===== -->
+        <div id="panel-config" class="tab-panel hidden fade-in">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- 人设 Prompt -->
+                <div class="bg-white rounded-xl shadow-sm border p-5">
+                    <h2 class="text-sm font-semibold text-gray-700 mb-4">主播人设 Prompt</h2>
+                    <textarea id="systemPrompt" rows="6" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-200 outline-none resize-none"></textarea>
+                    <button onclick="updatePrompt()" class="w-full mt-3 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium py-2 rounded-lg transition">更新人设</button>
+                </div>
+
+                <!-- TTS & 定时 -->
+                <div class="bg-white rounded-xl shadow-sm border p-5 space-y-4">
+                    <div>
+                        <h2 class="text-sm font-semibold text-gray-700 mb-3">TTS 配置</h2>
+                        <!-- TTS 提供商选择 -->
+                        <div class="mb-3">
+                            <label class="block text-xs text-gray-500 mb-1">TTS 服务商</label>
+                            <div class="flex gap-2">
+                                <button id="btnMiniMax" onclick="switchTTSProvider('minimax')" class="flex-1 text-xs py-2 rounded-lg border transition font-medium">MiniMax Speech-2.8</button>
+                                <button id="btnVolcengine" onclick="switchTTSProvider('volcengine')" class="flex-1 text-xs py-2 rounded-lg border transition font-medium">火山引擎 Seed-TTS</button>
+                            </div>
+                        </div>
+                        <div id="ttsConfig" class="text-xs text-gray-500 space-y-1">
+                            <p>加载中...</p>
+                        </div>
+                        <!-- 火山引擎：整体语言指令（context_texts，前端可填，仅火山引擎显示） -->
+                        <div id="contextTextGroup" class="mt-3" style="display:none;">
+                            <label class="block text-xs text-gray-500 mb-1">🔥 整体语言指令（火山引擎）</label>
+                            <textarea id="contextText" rows="3" placeholder="例如：专业电商主播，情绪自然起伏，口语松弛，真人直播节奏，不要机器感" class="w-full border rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-orange-200 outline-none resize-none"></textarea>
+                            <p class="text-[11px] text-gray-400 mt-1">合成时作为全局语音指令下发，预置音色与复刻音色均生效；留空则不下发。稿子将直接使用，不做任何 Agent 改写。</p>
+                            <button onclick="updateContextText()" class="w-full mt-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-medium py-2 rounded-lg transition">保存语言指令</button>
+                        </div>
+                    </div>
+                    <div class="border-t pt-4">
+                        <h2 class="text-sm font-semibold text-gray-700 mb-3">循环口播间隔</h2>
+                        <p class="text-[11px] text-gray-400 mb-2">整稿念完一遍后，停顿多少秒再从头开始下一遍（0 = 不停顿）</p>
+                        <div class="flex gap-2">
+                            <input id="timerInterval" type="number" value="2" min="0" class="flex-1 border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-200 outline-none">
+                            <span class="text-sm text-gray-500 self-center">秒</span>
+                            <button onclick="updateTimer()" class="bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition">更新</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 弹幕过滤规则 & 点名兜底名称池（运行时热更新，重启恢复默认） -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
+                <!-- 弹幕过滤规则 -->
+                <div class="bg-white rounded-xl shadow-sm border p-5">
+                    <h2 class="text-sm font-semibold text-gray-700 mb-1">弹幕过滤规则</h2>
+                    <p class="text-[11px] text-gray-400 mb-3">只有命中关键词的弹幕才会触发 AI 回答；此处修改<b>运行时立即生效</b>，重启后恢复 .env 默认。</p>
+                    <label class="block text-xs text-gray-500 mb-1">打断关键词（每行一个，或用逗号分隔）</label>
+                    <textarea id="filterKeywords" rows="5" placeholder="问一下&#10;多少钱&#10;怎么样" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-200 outline-none resize-none"></textarea>
+                    <div class="flex gap-3 mt-3">
+                        <div class="flex-1">
+                            <label class="block text-xs text-gray-500 mb-1">冷却时间(秒)</label>
+                            <input id="filterCooldown" type="number" min="0" step="0.5" value="3" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-200 outline-none">
+                        </div>
+                        <div class="flex-1">
+                            <label class="block text-xs text-gray-500 mb-1">最小字数</label>
+                            <input id="filterMinLength" type="number" min="0" step="1" value="2" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-200 outline-none">
+                        </div>
+                    </div>
+                    <button onclick="saveDanmakuFilter()" class="w-full mt-3 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium py-2 rounded-lg transition">保存过滤规则</button>
+                </div>
+
+                <!-- 点名兜底名称池 -->
+                <div class="bg-white rounded-xl shadow-sm border p-5">
+                    <h2 class="text-sm font-semibold text-gray-700 mb-1">点名兜底名称池</h2>
+                    <p class="text-[11px] text-gray-400 mb-3">稿子里写 <code class="bg-gray-100 px-1 rounded">{点名}</code> 会随机取一个名字念成「xx姐姐」。真实互动观众优先，无人互动时从下面的名称随机点名。</p>
+                    <label class="block text-xs text-gray-500 mb-1">兜底名称（每行一个，或用逗号分隔）</label>
+                    <textarea id="fallbackNames" rows="5" placeholder="小美&#10;丽丽&#10;小仙女" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-200 outline-none resize-none"></textarea>
+                    <div class="flex gap-2 mt-3">
+                        <input id="fallbackNameInput" type="text" placeholder="输入名称后点「新增」快速加入" class="flex-1 border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-200 outline-none">
+                        <button onclick="addFallbackName()" class="bg-green-500 hover:bg-green-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition">新增</button>
+                    </div>
+                    <button onclick="saveFallbackNames()" class="w-full mt-3 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium py-2 rounded-lg transition">保存名称池</button>
+                </div>
+            </div>
+
+            <!-- 商品问答资料（仅用于回答观众提问；持久化保存，重启不丢） -->
+            <div class="bg-white rounded-xl shadow-sm border p-5 mt-6">
+                <h2 class="text-sm font-semibold text-gray-700 mb-1">商品问答资料</h2>
+                <p class="text-[11px] text-gray-400 mb-4">仅用于<b>回答观众提问</b>（弹幕问答 / 播报中插入回答），不影响口播稿播报。AI 会严格依据下面的商品信息和问答示例作答。保存后<b>持久化到本地</b>，重启不丢。</p>
+                <label class="block text-xs text-gray-500 mb-1">商品信息（名称/价格/卖点/规格/优惠/库存等，是回答提问的唯一事实依据）</label>
+                <textarea id="productInfo" rows="5" placeholder="例如：&#10;商品：XX 保湿面霜 50g&#10;价格：九十九元，买一送一&#10;卖点：主打神经酰胺，敏感肌可用&#10;库存：现货，48 小时内发货" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-200 outline-none resize-none"></textarea>
+                <div class="flex items-center justify-between mt-4 mb-2">
+                    <label class="block text-xs text-gray-500">问答示例（AI 会模仿示例的内容与口吻回答同类问题）</label>
+                    <button onclick="addProductExample()" class="text-xs bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded-lg transition">＋ 新增示例</button>
+                </div>
+                <div id="productExamples" class="space-y-2"></div>
+                <p id="productExamplesEmpty" class="text-[11px] text-gray-400 py-2">还没有示例，点「＋ 新增示例」添加；示例越贴近真实提问，AI 回答越准。</p>
+                <button onclick="saveProduct()" class="w-full mt-4 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium py-2 rounded-lg transition">保存商品资料</button>
+            </div>
+        </div>
+
+        <!-- ===== 监控 ===== -->
+        <div id="panel-monitor" class="tab-panel hidden fade-in">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="bg-white rounded-xl shadow-sm border p-5">
+                    <h2 class="text-xs text-gray-500 mb-2">系统状态</h2>
+                    <div id="healthStatus" class="text-lg font-semibold text-green-500">检测中...</div>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border p-5">
+                    <h2 class="text-xs text-gray-500 mb-2">会话状态</h2>
+                    <div id="sessionStatus" class="text-sm text-gray-600">检测中...</div>
+                </div>
+                <div class="bg-white rounded-xl shadow-sm border p-5">
+                    <h2 class="text-xs text-gray-500 mb-2">音频队列</h2>
+                    <div id="audioQueue" class="text-sm text-gray-600">检测中...</div>
+                </div>
+            </div>
+            <div class="mt-6 bg-white rounded-xl shadow-sm border p-5">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-sm font-semibold text-gray-700">实时日志</h2>
+                    <button onclick="loadLogs()" class="text-xs text-blue-500 hover:text-blue-700">刷新</button>
+                </div>
+                <div id="logArea" class="bg-gray-900 text-green-400 rounded-lg p-4 text-xs font-mono h-48 overflow-y-auto">
+                    <p>等待日志加载...</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Toast 通知 -->
+    <div id="toast" class="fixed bottom-6 right-6 bg-gray-800 text-white text-sm px-4 py-2 rounded-lg shadow-lg hidden transition-opacity duration-300"></div>
+
+    <script>
+    const API = '';
+
+    // ===== Tab 切换 =====
+    function switchTab(name) {
+        document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-active'));
+        document.getElementById('panel-' + name).classList.remove('hidden');
+        document.getElementById('tab-' + name).classList.add('tab-active');
+        if (name === 'monitor') loadMonitor();
+        if (name === 'config') loadConfig();
+        if (name === 'voice') loadVoicePanel();
+        if (name === 'preview') { loadPreviewVoices(); updateEnrichVisibility(); }
+    }
+
+    // ===== Toast =====
+    function toast(msg, type = 'info') {
+        const el = document.getElementById('toast');
+        el.textContent = msg;
+        el.className = `fixed bottom-6 right-6 text-white text-sm px-4 py-2 rounded-lg shadow-lg transition-opacity duration-300 ${
+            type === 'error' ? 'bg-red-500' : type === 'success' ? 'bg-green-500' : 'bg-gray-800'
+        }`;
+        el.classList.remove('hidden');
+        setTimeout(() => el.classList.add('hidden'), 3000);
+    }
+
+    // ===== API 请求 =====
+    async function api(method, path, body = null) {
+        const opts = { method, headers: { 'Content-Type': 'application/json' } };
+        if (body) opts.body = JSON.stringify(body);
+        const res = await fetch(API + path, opts);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || '请求失败');
+        return data;
+    }
+
+    async function apiUpload(path, formData) {
+        const res = await fetch(API + path, { method: 'POST', body: formData });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.detail || '上传失败');
+        return data;
+    }
+
+    // ===== 直播控制 =====
+    async function startLive() {
+        try {
+            await api('POST', '/api/live/start', {
+                thread_id: document.getElementById('threadId').value,
+                mode: document.getElementById('runMode').value,
+            });
+            toast('直播已启动', 'success');
+            updateStatus();
+        } catch (e) { toast(e.message, 'error'); }
+    }
+
+    async function stopLive() {
+        try {
+            await api('POST', '/api/live/stop');
+            toast('直播已停止', 'success');
+            updateStatus();
+        } catch (e) { toast(e.message, 'error'); }
+    }
+
+    async function interruptLive() {
+        try {
+            await api('POST', '/api/live/interrupt', { reason: 'manual_abort' });
+            toast('已打断播报', 'success');
+        } catch (e) { toast(e.message, 'error'); }
+    }
+
+    async function manualInput() {
+        const text = document.getElementById('manualText').value.trim();
+        if (!text) return toast('请输入播报内容', 'error');
+        try {
+            await api('POST', '/api/live/manual_input', { text });
+            toast('话术已下发', 'success');
+            document.getElementById('manualText').value = '';
+        } catch (e) { toast(e.message, 'error'); }
+    }
+
+    // ===== 循环口播 =====
+    async function loopStart() {
+        const script = document.getElementById('loopScript').value.trim();
+        if (!script) return toast('请输入口播稿', 'error');
+        const status = document.getElementById('loopStatus');
+        status.textContent = '正在启动循环口播...';
+        try {
+            const data = await api('POST', '/api/live/loop-start', { script });
+            if (data.status === 'ok') {
+                toast('循环口播已开始', 'success');
+                status.innerHTML = '🔁 <span class="text-green-600">循环口播进行中</span>（声音从虚拟声卡输出，右上角显示「直播中」；点「停止循环」结束）';
+                updateStatus();
+            } else {
+                status.textContent = `失败: ${data.message}`;
+                toast(data.message || '启动失败', 'error');
+            }
+        } catch (e) {
+            status.textContent = `错误: ${e.message}`;
+            toast(e.message, 'error');
+        }
+    }
+
+    async function loopStop() {
+        const status = document.getElementById('loopStatus');
+        try {
+            const data = await api('POST', '/api/live/loop-stop');
+            status.textContent = data.status === 'ok' ? '⏹ 已停止循环口播' : `失败: ${data.message}`;
+            toast('循环口播已停止', 'success');
+            updateStatus();
+        } catch (e) {
+            status.textContent = `错误: ${e.message}`;
+            toast(e.message, 'error');
+        }
+    }
+
+    // ===== 音色克隆 =====
+    async function cloneVoice() {
+        const name = document.getElementById('voiceName').value.trim();
+        const cloneFile = document.getElementById('cloneAudio').files[0];
+        const promptFile = document.getElementById('promptAudio').files[0];
+        const previewText = document.getElementById('previewText').value.trim();
+
+        if (!name) return toast('请输入音色名称', 'error');
+        if (!cloneFile) return toast('请上传参考音频', 'error');
+
+        const resultDiv = document.getElementById('cloneResult');
+        resultDiv.innerHTML = '<span class="text-blue-500">处理中...</span>';
+
+        try {
+            // 1. 上传参考音频
+            const fd1 = new FormData();
+            fd1.append('file', cloneFile);
+            const uploadRes = await apiUpload('/api/voice-clone/upload-clone-audio', fd1);
+
+            // 2. 上传示例音频（可选）
+            let promptFileId = null;
+            if (promptFile) {
+                const fd2 = new FormData();
+                fd2.append('file', promptFile);
+                const promptRes = await apiUpload('/api/voice-clone/upload-prompt-audio', fd2);
+                promptFileId = promptRes.file_id;
+            }
+
+            // 3. 执行克隆（读取前端选项）
+            const cloneRes = await api('POST', '/api/voice-clone/clone', {
+                name,
+                file_id: String(uploadRes.file_id),
+                prompt_file_id: promptFileId ? String(promptFileId) : null,
+                text: previewText,
+                model: document.getElementById('optHD').checked ? 'speech-2.8-hd' : 'speech-2.8-turbo',
+                need_noise_reduction: document.getElementById('optNoise').checked,
+                need_volume_normalization: document.getElementById('optNorm').checked,
+                language_boost: document.getElementById('optBoost').checked ? 'Chinese' : '',
+            });
+
+            resultDiv.innerHTML = `<span class="text-green-500">克隆成功！voice_id: ${cloneRes.voice_id}</span>`;
+            toast('音色克隆成功', 'success');
+            loadVoices();
+        } catch (e) {
+            resultDiv.innerHTML = `<span class="text-red-500">失败: ${e.message}</span>`;
+            toast(e.message, 'error');
+        }
+    }
+
+    async function loadVoices() {
+        try {
+            const data = await api('GET', '/api/voice-clone/voices');
+            const list = document.getElementById('voiceList');
+            if (!data.voices || data.voices.length === 0) {
+                list.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">暂无克隆音色</p>';
+                return;
+            }
+            list.innerHTML = data.voices.map(v => `
+                <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    <div>
+                        <p class="text-sm font-medium text-gray-700">${v.name}</p>
+                        <p class="text-xs text-gray-400">${v.voice_id}</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="useVoice('${v.voice_id}')" class="text-xs bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600">使用</button>
+                        <button onclick="deleteVoice('${v.voice_id}')" class="text-xs bg-red-100 text-red-500 px-3 py-1 rounded hover:bg-red-200">删除</button>
+                    </div>
+                </div>
+            `).join('');
+        } catch (e) { toast(e.message, 'error'); }
+    }
+
+    async function useVoice(voiceId) {
+        try {
+            await api('POST', '/api/voice-clone/use', { voice_id: voiceId });
+            toast('已切换音色', 'success');
+        } catch (e) { toast(e.message, 'error'); }
+    }
+
+    async function deleteVoice(voiceId) {
+        if (!confirm('确定删除该音色？')) return;
+        try {
+            await api('DELETE', `/api/voice-clone/voices/${voiceId}`);
+            toast('已删除', 'success');
+            loadVoices();
+        } catch (e) { toast(e.message, 'error'); }
+    }
+
+    // ===== 试听试播 =====
+    async function loadPreviewVoices() {
+        try {
+            // 先获取当前 provider
+            const ttsConfig = await api('GET', '/api/config/tts');
+            currentProvider = ttsConfig.provider || 'minimax';
+            updateEnrichVisibility();
+            const isVolcengine = currentProvider === 'volcengine';
+
+            // 并行加载系统音色 + 对应 provider 的克隆/复刻音色
+            const [sysData, clonedData, volcClonedData] = await Promise.all([
+                api('GET', '/api/voice-clone/system-voices'),
+                isVolcengine ? Promise.resolve({ voices: [] }) : api('GET', '/api/voice-clone/voices'),
+                isVolcengine ? api('GET', '/api/voice-clone/volcengine/voices') : Promise.resolve({ voices: [] }),
+            ]);
+            const selectors = ['previewTtsVoice', 'testBroadcastVoice', 'simDanmakuVoice'];
+            const defaultLabel = isVolcengine
+                ? '默认音色 (' + (ttsConfig.voice || '预置') + ')'
+                : '默认音色 (female-shaonv)';
+            selectors.forEach(id => {
+                const sel = document.getElementById(id);
+                sel.innerHTML = `<option value="">${defaultLabel}</option>`;
+                // 系统音色 - 按分组展示
+                if (sysData.voices) {
+                    for (const [group, voices] of Object.entries(sysData.voices)) {
+                        if (voices.length === 0) continue;
+                        const optgroup = document.createElement('optgroup');
+                        optgroup.label = group + ' (' + voices.length + ')';
+                        voices.forEach(v => {
+                            const opt = document.createElement('option');
+                            opt.value = v.voice_id;
+                            opt.textContent = v.name + (v.style ? ' [' + v.style + ']' : '');
+                            optgroup.appendChild(opt);
+                        });
+                        sel.appendChild(optgroup);
+                    }
+                }
+                // MiniMax 克隆音色
+                if (!isVolcengine && clonedData.voices && clonedData.voices.length > 0) {
+                    const optgroup = document.createElement('optgroup');
+                    optgroup.label = '克隆音色 (' + clonedData.voices.length + ')';
+                    clonedData.voices.forEach(v => {
+                        const opt = document.createElement('option');
+                        opt.value = v.voice_id;
+                        opt.textContent = '★ ' + v.name;
+                        optgroup.appendChild(opt);
+                    });
+                    sel.appendChild(optgroup);
+                }
+                // 火山复刻音色（仅可用状态）
+                if (isVolcengine && volcClonedData.voices && volcClonedData.voices.length > 0) {
+                    const usable = volcClonedData.voices.filter(v => v.usable);
+                    if (usable.length > 0) {
+                        const optgroup = document.createElement('optgroup');
+                        optgroup.label = '★ 复刻音色 (' + usable.length + ')';
+                        usable.forEach(v => {
+                            const opt = document.createElement('option');
+                            opt.value = v.speaker_id;
+                            opt.textContent = '★ ' + (v.name || v.speaker_id);
+                            optgroup.appendChild(opt);
+                        });
+                        sel.appendChild(optgroup);
+                    }
+                }
+            });
+        } catch (e) { console.error('加载音色失败:', e); }
+    }
+
+    function playAudioFromBase64(audioEl, audioBase64) {
+        const binaryStr = atob(audioBase64);
+        const bytes = new Uint8Array(binaryStr.length);
+        for (let i = 0; i < binaryStr.length; i++) bytes[i] = binaryStr.charCodeAt(i);
+        const blob = new Blob([bytes], { type: 'audio/wav' });
+        const url = URL.createObjectURL(blob);
+        audioEl.src = url;
+        audioEl.classList.remove('hidden');
+        audioEl.play().catch(() => {});
+    }
+
+    async function previewTTS() {
+        const text = document.getElementById('previewTtsText').value.trim();
+        if (!text) return toast('请输入试听文本', 'error');
+        const voiceId = document.getElementById('previewTtsVoice').value;
+        const enrich = currentProvider !== 'volcengine' && document.getElementById('previewTtsEnrich').checked;
+        const btn = document.getElementById('btnPreviewTts');
+        const status = document.getElementById('previewTtsStatus');
+        const audio = document.getElementById('previewTtsAudio');
+
+        const isVolc = currentProvider === 'volcengine';
+        btn.disabled = true; btn.textContent = isVolc ? '合成中...' : (enrich ? '标注中...' : '合成中...');
+        status.textContent = isVolc ? '正在用原稿直接合成（整体语言指令已生效）...' : (enrich ? '正在进行口语化标注 + TTS 合成...' : '正在调用 TTS 合成...');
+        try {
+            const data = await api('POST', '/api/preview/tts-preview', { text, voice_id: voiceId || null, enrich });
+            if (data.status === 'ok' && data.audio_base64) {
+                playAudioFromBase64(audio, data.audio_base64);
+                const sizeKB = (data.audio_size / 1024).toFixed(1);
+                let msg = `合成完成 | 文本 ${data.text_length} 字 | 音频 ${sizeKB} KB`;
+                if (data.enriched_text) {
+                    msg += ` | 已口语化标注`;
+                    status.innerHTML = msg + `<br><span class="text-blue-500">标注后: ${data.enriched_text}</span>`;
+                } else {
+                    status.textContent = msg;
+                }
+                toast('试听合成成功', 'success');
+            } else {
+                status.textContent = `失败: ${data.message}`;
+                toast(data.message || '合成失败', 'error');
+            }
+        } catch (e) {
+            status.textContent = `错误: ${e.message}`;
+            toast(e.message, 'error');
+        } finally {
+            btn.disabled = false; btn.textContent = '合成试听';
+        }
+    }
+
+    async function testBroadcast() {
+        const script = document.getElementById('testBroadcastScript').value.trim();
+        if (!script) return toast('请输入脚本内容', 'error');
+        const voiceId = document.getElementById('testBroadcastVoice').value;
+        const btn = document.getElementById('btnTestBroadcast');
+        const status = document.getElementById('testBroadcastStatus');
+
+        btn.disabled = true; btn.textContent = '试播中...';
+        status.textContent = '正在触发直播会话（稿子直读，声音从虚拟声卡输出）...';
+        try {
+            const data = await api('POST', '/api/preview/test-broadcast', { script, voice_id: voiceId || null });
+            if (data.status === 'ok') {
+                toast('已开始试播', 'success');
+                status.textContent = data.message || '已开始试播（声音从虚拟声卡输出）';
+                // 并入直播后浏览器不再播放音频，靠轮询展示播报状态
+                pollBroadcastStatus('testBroadcastStatus', null);
+            } else {
+                status.textContent = `失败: ${data.message}`;
+                toast(data.message || '试播失败', 'error');
+            }
+        } catch (e) {
+            status.textContent = `错误: ${e.message}`;
+            toast(e.message, 'error');
+        } finally {
+            btn.disabled = false; btn.textContent = '开始试播';
+        }
+    }
+
+    async function simulateDanmaku() {
+        const question = document.getElementById('simDanmakuQuestion').value.trim();
+        if (!question) return toast('请输入提问内容', 'error');
+        const nickname = document.getElementById('simDanmakuNickname').value.trim();
+        const voiceId = document.getElementById('simDanmakuVoice').value;
+        const btn = document.getElementById('btnSimDanmaku');
+        const replyDiv = document.getElementById('simDanmakuReply');
+        const status = document.getElementById('simDanmakuStatus');
+
+        btn.disabled = true; btn.textContent = '发送中...';
+        replyDiv.innerHTML = '<span class="text-blue-500">已发送，正在触发直播会话（若在播报将自动打断并承接）...</span>';
+        status.textContent = '正在触发弹幕回复会话...';
+        try {
+            const data = await api('POST', '/api/preview/simulate-danmaku', { question, nickname: nickname || null, voice_id: voiceId || null });
+            if (data.status === 'ok') {
+                toast('已发送提问', 'success');
+                status.textContent = data.message || '已发送提问';
+                // 音频走声卡，AI 回复文本靠轮询 last_text 展示
+                pollBroadcastStatus('simDanmakuStatus', 'simDanmakuReply');
+            } else {
+                replyDiv.innerHTML = `<span class="text-red-500">${data.message}</span>`;
+                toast(data.message || '模拟失败', 'error');
+            }
+        } catch (e) {
+            replyDiv.innerHTML = `<span class="text-red-500">${e.message}</span>`;
+            status.textContent = `错误: ${e.message}`;
+            toast(e.message, 'error');
+        } finally {
+            btn.disabled = false; btn.textContent = '发送提问';
+        }
+    }
+
+    // 轮询直播会话播报状态（并入直播后音频走声卡，前端靠轮询显示状态与最近文本）
+    let _broadcastPollTimer = null;
+    function pollBroadcastStatus(statusElId, replyElId) {
+        if (_broadcastPollTimer) { clearInterval(_broadcastPollTimer); _broadcastPollTimer = null; }
+        let sawBusy = false;
+        let ticks = 0;
+        const maxTicks = 150; // 最多轮询 ~3 分钟兜底
+        _broadcastPollTimer = setInterval(async () => {
+            ticks++;
+            try {
+                const st = await api('GET', '/api/live/status');
+                if (st.is_busy) sawBusy = true;
+                const statusEl = document.getElementById(statusElId);
+                if (statusEl) {
+                    statusEl.textContent = st.is_busy
+                        ? '🔊 正在播报中（声音从虚拟声卡输出）...'
+                        : (sawBusy ? '✅ 播报结束' : '等待播报开始...');
+                }
+                if (replyElId && st.last_text) {
+                    const replyEl = document.getElementById(replyElId);
+                    if (replyEl) replyEl.innerHTML = `<p class="text-gray-700">${st.last_text}</p>`;
+                }
+                // 播报过且现已空闲 → 结束轮询；或达到兜底上限
+                if ((sawBusy && !st.is_busy) || ticks >= maxTicks) {
+                    clearInterval(_broadcastPollTimer); _broadcastPollTimer = null;
+                }
+            } catch (e) {
+                clearInterval(_broadcastPollTimer); _broadcastPollTimer = null;
+            }
+        }, 1200);
+    }
+
+    // ===== 配置管理 =====
+    let currentProvider = 'minimax';
+
+    function updateProviderButtons(provider) {
+        const btnMini = document.getElementById('btnMiniMax');
+        const btnVolc = document.getElementById('btnVolcengine');
+        if (provider === 'minimax') {
+            btnMini.className = 'flex-1 text-xs py-2 rounded-lg border-2 border-blue-500 bg-blue-50 text-blue-600 transition font-medium';
+            btnVolc.className = 'flex-1 text-xs py-2 rounded-lg border border-gray-200 text-gray-500 hover:border-blue-300 transition font-medium';
+        } else {
+            btnVolc.className = 'flex-1 text-xs py-2 rounded-lg border-2 border-orange-500 bg-orange-50 text-orange-600 transition font-medium';
+            btnMini.className = 'flex-1 text-xs py-2 rounded-lg border border-gray-200 text-gray-500 hover:border-orange-300 transition font-medium';
+        }
+    }
+
+    async function switchTTSProvider(provider) {
+        if (provider === currentProvider) return;
+        try {
+            await api('PUT', '/api/config/tts-provider', { provider });
+            currentProvider = provider;
+            updateProviderButtons(provider);
+            updateEnrichVisibility();
+            toast(`已切换到 ${provider === 'minimax' ? 'MiniMax' : '火山引擎'}`, 'success');
+            loadConfig();
+            // 如果当前在试听页，刷新音色列表
+            const previewPanel = document.getElementById('panel-preview');
+            if (!previewPanel.classList.contains('hidden')) {
+                loadPreviewVoices();
+            }
+        } catch (e) { toast(e.message, 'error'); }
+    }
+
+    // 根据当前 provider 更新口语化标注复选框的可见性
+    function updateEnrichVisibility() {
+        const isVolcengine = currentProvider === 'volcengine';
+        const enrichGroups = ['enrichGroup-preview'];
+        enrichGroups.forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = isVolcengine ? 'none' : 'flex';
+        });
+        // 火山引擎「整体语言指令」输入区：仅火山引擎显示
+        const ctxGroup = document.getElementById('contextTextGroup');
+        if (ctxGroup) ctxGroup.style.display = isVolcengine ? 'block' : 'none';
+        // 试听页 provider 提示条
+        const hint = document.getElementById('previewProviderHint');
+        if (hint) {
+            if (isVolcengine) {
+                hint.className = 'mb-4 rounded-lg p-3 text-sm font-medium bg-orange-50 text-orange-700 border border-orange-200';
+                hint.innerHTML = '🔥 当前使用 <b>火山引擎 Seed-TTS 2.0 Expressive</b>：<b>直接使用原稿合成，不做任何 Agent 改写</b>；整体语气/情绪由「配置管理 → 整体语言指令」全局控制（预置 + 复刻音色均生效）';
+                hint.classList.remove('hidden');
+            } else {
+                hint.className = 'mb-4 rounded-lg p-3 text-sm font-medium bg-blue-50 text-blue-700 border border-blue-200';
+                hint.innerHTML = '🎯 当前使用 <b>MiniMax Speech-2.8</b>，支持口语化标注（添加停顿/语气词/情感），让 TTS 合成更自然';
+                hint.classList.remove('hidden');
+            }
+        }
+    }
+
+    // 音色克隆面板 provider 感知
+    function loadVoicePanel() {
+        const isVolcengine = currentProvider === 'volcengine';
+        const hint = document.getElementById('voiceProviderHint');
+        const content = document.getElementById('voiceCloneContent');
+        const volcContent = document.getElementById('volcCloneContent');
+        if (isVolcengine) {
+            hint.className = 'mb-4 rounded-lg p-3 text-sm font-medium bg-orange-50 text-orange-700 border border-orange-200';
+            hint.innerHTML = '🔥 当前使用 <b>火山引擎 Seed-TTS</b>。声音复刻音色需先在控制台训练获取 speaker_id（S_ 开头），在下方查询状态后即可用于合成';
+            hint.classList.remove('hidden');
+            if (content) content.style.display = 'none';
+            if (volcContent) volcContent.classList.remove('hidden');
+            loadVolcVoices();
+        } else {
+            hint.classList.add('hidden');
+            if (content) content.style.display = 'block';
+            if (volcContent) volcContent.classList.add('hidden');
+            loadVoices();
+        }
+    }
+
+    // ===== 火山引擎复刻音色 =====
+    function volcStatusBadge(key, text, usable) {
+        const cls = usable ? 'bg-green-100 text-green-600'
+            : key === 'training' ? 'bg-yellow-100 text-yellow-600'
+            : key === 'failed' ? 'bg-red-100 text-red-500'
+            : 'bg-gray-100 text-gray-500';
+        return `<span class="shrink-0 text-[11px] px-2 py-0.5 rounded-full ${cls}">${text}</span>`;
+    }
+
+    function playVolcDemo(url) {
+        const a = new Audio(url);
+        a.play().catch(() => toast('试听音频播放失败（链接可能已过期，请刷新状态）', 'error'));
+    }
+
+    async function loadVolcVoices() {
+        try {
+            const data = await api('GET', '/api/voice-clone/volcengine/voices');
+            const list = document.getElementById('volcVoiceList');
+            if (!data.voices || data.voices.length === 0) {
+                list.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">暂无复刻音色</p>';
+                return;
+            }
+            list.innerHTML = data.voices.map(v => {
+                const badge = volcStatusBadge(v.status_key, v.status_text, v.usable);
+                const demo = v.demo_audio ? `<button onclick="playVolcDemo('${v.demo_audio}')" class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded hover:bg-gray-200">▶ 试听</button>` : '';
+                const useBtn = v.usable ? `<button onclick="useVolcVoice('${v.speaker_id}')" class="text-xs bg-orange-500 text-white px-3 py-1 rounded hover:bg-orange-600">使用</button>` : '';
+                const meta = [v.language_text ? '语种: ' + v.language_text : '', v.model_type ? 'model_type: ' + v.model_type : ''].filter(Boolean).join(' · ');
+                return `
+                <div class="p-3 bg-gray-50 rounded-lg">
+                    <div class="flex items-center justify-between gap-2">
+                        <div class="min-w-0">
+                            <p class="text-sm font-medium text-gray-700 truncate">${v.name || v.speaker_id}</p>
+                            <p class="text-xs text-gray-400 font-mono truncate">${v.speaker_id}</p>
+                        </div>
+                        ${badge}
+                    </div>
+                    <div class="flex items-center justify-between mt-2">
+                        <div class="text-[11px] text-gray-400">${meta}</div>
+                        <div class="flex gap-2">
+                            ${demo}
+                            ${useBtn}
+                            <button onclick="deleteVolcVoice('${v.speaker_id}')" class="text-xs bg-red-100 text-red-500 px-2 py-1 rounded hover:bg-red-200">删除</button>
+                        </div>
+                    </div>
+                </div>`;
+            }).join('');
+        } catch (e) { toast(e.message, 'error'); }
+    }
+
+    async function queryVolcVoice() {
+        const speakerId = document.getElementById('volcSpeakerId').value.trim();
+        const name = document.getElementById('volcVoiceName').value.trim();
+        const resultDiv = document.getElementById('volcQueryResult');
+        if (!speakerId) return toast('请输入 Speaker ID', 'error');
+        const btn = document.getElementById('btnQueryVolc');
+        btn.disabled = true; btn.textContent = '查询中...';
+        resultDiv.innerHTML = '<span class="text-blue-500">正在查询音色状态...</span>';
+        try {
+            const data = await api('POST', '/api/voice-clone/volcengine/query', { speaker_id: speakerId, name });
+            const v = data.voice;
+            resultDiv.innerHTML = `<span class="${v.usable ? 'text-green-500' : 'text-yellow-600'}">查询成功：${v.status_text}${v.usable ? '，可用于合成' : '（暂不可用）'}</span>`;
+            toast('音色查询成功', 'success');
+            document.getElementById('volcSpeakerId').value = '';
+            document.getElementById('volcVoiceName').value = '';
+            loadVolcVoices();
+        } catch (e) {
+            resultDiv.innerHTML = `<span class="text-red-500">失败: ${e.message}</span>`;
+            toast(e.message, 'error');
+        } finally {
+            btn.disabled = false; btn.textContent = '查询并添加';
+        }
+    }
+
+    async function refreshVolcVoices() {
+        try {
+            toast('正在刷新音色状态...', 'info');
+            await api('POST', '/api/voice-clone/volcengine/refresh');
+            await loadVolcVoices();
+            toast('状态已刷新', 'success');
+        } catch (e) { toast(e.message, 'error'); }
+    }
+
+    async function useVolcVoice(speakerId) {
+        try {
+            await api('POST', '/api/voice-clone/volcengine/use', { speaker_id: speakerId });
+            toast('已切换复刻音色', 'success');
+        } catch (e) { toast(e.message, 'error'); }
+    }
+
+    async function deleteVolcVoice(speakerId) {
+        if (!confirm('确定从列表移除该复刻音色？')) return;
+        try {
+            await api('DELETE', `/api/voice-clone/volcengine/voices/${speakerId}`);
+            toast('已删除', 'success');
+            loadVolcVoices();
+        } catch (e) { toast(e.message, 'error'); }
+    }
+
+    async function loadConfig() {
+        try {
+            const [prompt, tts] = await Promise.all([
+                api('GET', '/api/config/prompt'),
+                api('GET', '/api/config/tts'),
+            ]);
+            document.getElementById('systemPrompt').value = prompt.system_prompt;
+            currentProvider = tts.provider || 'minimax';
+            updateProviderButtons(currentProvider);
+            updateEnrichVisibility();
+
+            let configHtml = '';
+            if (currentProvider === 'volcengine') {
+                configHtml = `
+                    <p>服务商: <span class="text-orange-600 font-medium">火山引擎 Seed-TTS</span></p>
+                    <p>模型: <span class="text-gray-700">${tts.model}</span></p>
+                    <p>音色: <span class="text-gray-700">${tts.voice}</span></p>
+                    <p>语速: <span class="text-gray-700">${tts.speed}</span></p>
+                    <p>编码: <span class="text-gray-700">${tts.encoding}</span></p>
+                    <p>集群: <span class="text-gray-700">${tts.cluster}</span></p>
+                    ${tts.cloned_voice_id ? `<p>克隆音色: <span class="text-purple-600 font-medium">${tts.cloned_voice_id}</span></p>` : ''}
+                `;
+                const ctxEl = document.getElementById('contextText');
+                if (ctxEl) ctxEl.value = tts.context_text || '';
+            } else {
+                configHtml = `
+                    <p>服务商: <span class="text-blue-600 font-medium">MiniMax Speech-2.8</span></p>
+                    <p>模型: <span class="text-gray-700">${tts.model}</span></p>
+                    <p>音色: <span class="text-gray-700">${tts.voice}</span></p>
+                    <p>语速: <span class="text-gray-700">${tts.speed}</span></p>
+                    ${tts.cloned_voice_id ? `<p>克隆音色: <span class="text-purple-600 font-medium">${tts.cloned_voice_id}</span></p>` : ''}
+                `;
+            }
+            document.getElementById('ttsConfig').innerHTML = configHtml;
+            loadDanmakuConfig();   // 同时加载弹幕过滤规则 + 点名兜底名称池
+            loadProduct();         // 加载商品问答资料（商品信息 + 示例）
+        } catch (e) { toast(e.message, 'error'); }
+    }
+
+    async function updatePrompt() {
+        const text = document.getElementById('systemPrompt').value.trim();
+        if (!text) return toast('Prompt 不能为空', 'error');
+        try {
+            await api('PUT', '/api/config/prompt', { system_prompt: text });
+            toast('人设已更新', 'success');
+        } catch (e) { toast(e.message, 'error'); }
+    }
+
+    // 保存火山引擎「整体语言指令」（context_texts，允许留空表示不下发）
+    async function updateContextText() {
+        const el = document.getElementById('contextText');
+        const text = el ? el.value.trim() : '';
+        try {
+            await api('PUT', '/api/config/context-text', { context_text: text });
+            toast(text ? '整体语言指令已保存' : '整体语言指令已清空（不再下发）', 'success');
+        } catch (e) { toast(e.message, 'error'); }
+    }
+
+    async function updateTimer() {
+        const seconds = parseInt(document.getElementById('timerInterval').value);
+        if (isNaN(seconds) || seconds < 0) return toast('间隔不能为负数', 'error');
+        try {
+            await api('PUT', '/api/config/timer', { interval_seconds: seconds });
+            toast(`循环口播间隔已更新为 ${seconds} 秒`, 'success');
+        } catch (e) { toast(e.message, 'error'); }
+    }
+
+    // ===== 弹幕过滤规则 & 点名兜底名称池（配置面板，运行时热更新）=====
+    function _parseNameList(text) {
+        return (text || '').split(/[\n,，]/).map(s => s.trim()).filter(Boolean);
+    }
+
+    async function loadDanmakuConfig() {
+        try {
+            const [filter, pool] = await Promise.all([
+                api('GET', '/api/config/danmaku-filter'),
+                api('GET', '/api/config/fallback-names'),
+            ]);
+            document.getElementById('filterKeywords').value = (filter.keywords || []).join('\n');
+            document.getElementById('filterCooldown').value = (filter.cooldown_seconds ?? 3);
+            document.getElementById('filterMinLength').value = (filter.min_text_length ?? 2);
+            document.getElementById('fallbackNames').value = (pool.names || []).join('\n');
+        } catch (e) { toast(e.message, 'error'); }
+    }
+
+    async function saveDanmakuFilter() {
+        const keywords = _parseNameList(document.getElementById('filterKeywords').value);
+        const cooldown = parseFloat(document.getElementById('filterCooldown').value);
+        const minLen = parseInt(document.getElementById('filterMinLength').value);
+        if (keywords.length === 0) return toast('至少保留一个关键词', 'error');
+        if (isNaN(cooldown) || cooldown < 0) return toast('冷却时间不能为负', 'error');
+        if (isNaN(minLen) || minLen < 0) return toast('最小字数不能为负', 'error');
+        try {
+            await api('PUT', '/api/config/danmaku-filter', { keywords, cooldown_seconds: cooldown, min_text_length: minLen });
+            toast(`过滤规则已更新（${keywords.length} 个关键词）`, 'success');
+        } catch (e) { toast(e.message, 'error'); }
+    }
+
+    function addFallbackName() {
+        const input = document.getElementById('fallbackNameInput');
+        const name = input.value.trim();
+        if (!name) return toast('请输入名称', 'error');
+        const ta = document.getElementById('fallbackNames');
+        const existing = _parseNameList(ta.value);
+        if (existing.includes(name)) return toast('该名称已在列表中', 'error');
+        existing.push(name);
+        ta.value = existing.join('\n');
+        input.value = '';
+        toast('已加入列表，点「保存名称池」后生效', 'success');
+    }
+
+    async function saveFallbackNames() {
+        const names = _parseNameList(document.getElementById('fallbackNames').value);
+        try {
+            await api('PUT', '/api/config/fallback-names', { names });
+            toast(`兜底名称池已更新（${names.length} 个）`, 'success');
+        } catch (e) { toast(e.message, 'error'); }
+    }
+
+    // ===== 商品问答资料（仅问答用，持久化到本地）=====
+    function _escapeHtml(s) {
+        return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    function addProductExample(question = '', answer = '') {
+        const wrap = document.getElementById('productExamples');
+        const row = document.createElement('div');
+        row.className = 'product-example border rounded-lg p-3 bg-gray-50';
+        row.innerHTML = `
+            <div class="flex items-start gap-2">
+                <div class="flex-1 space-y-2">
+                    <input type="text" class="pe-q w-full border rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-200 outline-none" placeholder="观众问题，如：这个多少钱？" value="${_escapeHtml(question)}">
+                    <input type="text" class="pe-a w-full border rounded px-2 py-1 text-sm focus:ring-2 focus:ring-blue-200 outline-none" placeholder="标准回答，如：只要九十九，还买一送一哦" value="${_escapeHtml(answer)}">
+                </div>
+                <button onclick="removeProductExample(this)" class="text-red-500 hover:text-red-700 text-sm px-2 py-1">删除</button>
+            </div>
+        `;
+        wrap.appendChild(row);
+        _updateProductExamplesEmpty();
+    }
+
+    function removeProductExample(btn) {
+        btn.closest('.product-example').remove();
+        _updateProductExamplesEmpty();
+    }
+
+    function _updateProductExamplesEmpty() {
+        const count = document.querySelectorAll('#productExamples .product-example').length;
+        document.getElementById('productExamplesEmpty').style.display = count === 0 ? 'block' : 'none';
+    }
+
+    async function loadProduct() {
+        try {
+            const data = await api('GET', '/api/config/product');
+            document.getElementById('productInfo').value = data.product_info || '';
+            document.getElementById('productExamples').innerHTML = '';
+            (data.examples || []).forEach(ex => addProductExample(ex.question, ex.answer));
+            _updateProductExamplesEmpty();
+        } catch (e) { toast(e.message, 'error'); }
+    }
+
+    async function saveProduct() {
+        const productInfo = document.getElementById('productInfo').value.trim();
+        const examples = [];
+        document.querySelectorAll('#productExamples .product-example').forEach(row => {
+            const q = row.querySelector('.pe-q').value.trim();
+            const a = row.querySelector('.pe-a').value.trim();
+            if (q && a) examples.push({ question: q, answer: a });
+        });
+        try {
+            await api('PUT', '/api/config/product', { product_info: productInfo, examples });
+            toast(`商品资料已保存（${examples.length} 条示例）`, 'success');
+        } catch (e) { toast(e.message, 'error'); }
+    }
+
+    // ===== 监控 =====
+    async function loadMonitor() {
+        try {
+            const [health, session, queue] = await Promise.all([
+                api('GET', '/api/monitor/health'),
+                api('GET', '/api/monitor/status'),
+                api('GET', '/api/monitor/audio-queue'),
+            ]);
+            document.getElementById('healthStatus').innerHTML = `<span class="text-green-500">${health.status}</span>`;
+            document.getElementById('sessionStatus').innerHTML = `
+                <p>忙碌: <span class="${session.is_busy ? 'text-amber-500 font-medium' : 'text-gray-400'}">${session.is_busy ? '是' : '否'}</span></p>
+                <p>任务运行: <span class="${session.task_running ? 'text-amber-500 font-medium' : 'text-gray-400'}">${session.task_running ? '是' : '否'}</span></p>
+            `;
+            document.getElementById('audioQueue').innerHTML = `
+                <p>队列大小: <span class="font-medium text-gray-700">${queue.size}</span></p>
+                <p>队列空: <span class="${queue.is_empty ? 'text-green-500' : 'text-amber-500'}">${queue.is_empty ? '是' : '否'}</span></p>
+            `;
+        } catch (e) { toast(e.message, 'error'); }
+    }
+
+    async function loadLogs() {
+        try {
+            const data = await api('GET', '/api/monitor/logs');
+            const area = document.getElementById('logArea');
+            if (data.logs && data.logs.length > 0) {
+                area.innerHTML = data.logs.map(l => `<p>${l}</p>`).join('');
+            } else {
+                area.innerHTML = '<p class="text-gray-500">日志功能待实现</p>';
+            }
+        } catch (e) {
+            document.getElementById('logArea').innerHTML = `<p class="text-red-400">${e.message}</p>`;
+        }
+    }
+
+    async function updateStatus() {
+        try {
+            const data = await api('GET', '/api/live/status');
+            const dot = document.getElementById('statusDot');
+            const text = document.getElementById('statusText');
+            if (data.is_busy || data.task_running) {
+                dot.className = 'pulse-dot live';
+                text.textContent = '直播中';
+                text.className = 'text-green-600 text-sm font-medium';
+            } else {
+                dot.className = 'pulse-dot idle';
+                text.textContent = '空闲';
+                text.className = 'text-gray-500 text-sm';
+            }
+        } catch (e) {}
+    }
+
+    // 初始化
+    updateStatus();
+    setInterval(updateStatus, 5000);
+    // 加载初始 provider 状态
+    api('GET', '/api/config/tts').then(data => {
+        currentProvider = data.provider || 'minimax';
+        updateProviderButtons(currentProvider);
+        updateEnrichVisibility();
+    }).catch(() => {});
+    </script>
+</body>
+</html>
