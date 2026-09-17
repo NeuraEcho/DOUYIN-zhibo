@@ -557,6 +557,10 @@ class VolcengineTTSAdapter(BaseTTSAdapter):
         self._session_id = str(uuid.uuid4())
         session_id = self._session_id
 
+        # 用量统计：火山引擎按字符计费，埋点覆盖所有 TTS 调用路径
+        from scheduler.usage_tracker import UsageTracker
+        UsageTracker.get_instance().record_tts("volcengine", text)
+
         try:
             logger.info(
                 f"[Volcengine-TTS] 开始 WebSocket 合成, text长度={len(text)}, "

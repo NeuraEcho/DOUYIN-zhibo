@@ -18,6 +18,11 @@ from services.tts_factory import create_tts_adapter
 
 router = APIRouter()
 
+# 直接用原稿合成的提供商：不走 MiniMax 口语化标注。
+# 标注会注入 (breath)/(chuckle)/(sighs) 这类 MiniMax 专属标签，
+# 火山引擎与 ElevenLabs 都不识别，会被当正文念出来。
+_DIRECT_SYNTH_PROVIDERS = ("volcengine", "elevenlabs")
+
 
 # ---------- 请求模型 ----------
 
@@ -103,7 +108,7 @@ async def _call_tts(text: str, voice_id: Optional[str] = None) -> bytes:
                 adapter.set_cloned_voice(voice_id)
                 logger.info(f"[TTS] 使用克隆音色: {voice_id}")
         else:
-            # 火山引擎：所有 voice_id 都作为 voice_type
+            # 火山引擎 / ElevenLabs：所有 voice_id 都直接作为厂商音色 ID
             adapter.set_cloned_voice(voice_id)
             logger.info(f"[TTS] 使用音色: {voice_id}")
     else:
@@ -116,10 +121,12 @@ async def _call_tts(text: str, voice_id: Optional[str] = None) -> bytes:
     try:
         pcm_chunks = await adapter.synthesize(text)
         pcm_data = b"".join(pcm_chunks)
-        # MiniMax 和 火山引擎 V3 都输出 PCM 裸音频，统一封装 WAV
+        # 三个提供商都输出 16-bit 单声道 PCM 裸音频，统一封装 WAV（采样率必须与合成时一致，否则变调）
         provider = get_tts_provider()
         if provider == "volcengine":
             sample_rate = settings.volcengine.sample_rate
+        elif provider == "elevenlabs":
+            sample_rate = settings.elevenlabs.sample_rate
         else:
             sample_rate = settings.speech.sample_rate
         wav_data = _pcm_to_wav(pcm_data, sample_rate=sample_rate)
@@ -148,8 +155,10 @@ async def tts_preview(request: TTSPreviewRequest):
         provider = get_tts_provider()
         tts_text = request.text
 
-        if provider == "volcengine":
-            # 火山引擎：直接使用原稿合成，不做 Agent 改写；整体语气由适配器 context_texts 全局控制（前端可填）
+        if provider in _DIRECT_SYNTH_PROVIDERS:
+            # 火山引擎 / ElevenLabs：直接使用原稿合成，不做 Agent 改写。
+            # 火山整体语气由适配器 context_texts 全局控制（前端可填）；
+            # ElevenLabs 语气由 voice_settings（stability/similarity_boost）控制。
             wav_data = await _call_tts(request.text, request.voice_id)
         else:
             # MiniMax：口语化标注
@@ -166,7 +175,10 @@ async def tts_preview(request: TTSPreviewRequest):
             "audio_base64": audio_b64,
             "audio_size": len(wav_data),
             "text_length": len(request.text),
-            "enriched_text": (tts_text if request.enrich else None) if provider != "volcengine" else None,
+            "enriched_text": (
+                (tts_text if request.enrich else None)
+                if provider not in _DIRECT_SYNTH_PROVIDERS else None
+            ),
             "provider": provider,
         }
     except Exception as e:

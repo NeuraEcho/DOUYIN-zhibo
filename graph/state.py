@@ -78,7 +78,7 @@ class LiveState:
     interrupted_text: str = ""                      # 被打断时正在播报的文本
 
     # ========== 事件输入 ==========
-    trigger_source: str = ""                        # 触发来源: "timer" / "danmaku" / "manual" / "preview_broadcast" / "preview_danmaku"
+    trigger_source: str = ""                        # 触发来源: "timer" / "danmaku" / "channels"（视频号） / "manual" / "preview_broadcast" / "preview_danmaku" / "script_resume"
     trigger_content: str = ""                       # 触发内容
     trigger_nickname: str = ""                      # 提问观众昵称（弹幕/模拟提问），回答时格式化为「xx姐姐」称呼
 

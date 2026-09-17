@@ -120,6 +120,10 @@ class DeepSeekR1Adapter(BaseLLMAdapter):
                         continue
 
             logger.info(f"[DeepSeek-R1] 流式请求完成, 输出长度={len(full_text)}")
+            # 用量统计：记录本次 LLM 输入/输出字符（token 由字符估算）
+            from scheduler.usage_tracker import UsageTracker
+            _in_text = "".join(m.get("content", "") for m in messages)
+            UsageTracker.get_instance().record_llm(self._model, _in_text, full_text)
             return full_text
 
         except httpx.TimeoutException as e:
@@ -149,6 +153,7 @@ class DeepSeekR1Adapter(BaseLLMAdapter):
         }
 
         try:
+            out_buf = ""  # 累计输出字符，供用量统计
             logger.info(f"[DeepSeek-R1] 开始真流式请求, model={self._model}")
 
             async with client.stream("POST", "/chat/completions", json=request_body) as response:
@@ -182,12 +187,17 @@ class DeepSeekR1Adapter(BaseLLMAdapter):
 
                         content = delta.get("content", "")
                         if content:
+                            out_buf += content
                             yield content
 
                     except json.JSONDecodeError:
                         logger.warning(f"[DeepSeek-R1] SSE JSON 解析失败: {data_str[:100]}")
                         continue
 
+            # 用量统计：记录本次流式 LLM 输入/输出字符
+            from scheduler.usage_tracker import UsageTracker
+            _in_text = "".join(m.get("content", "") for m in messages)
+            UsageTracker.get_instance().record_llm(self._model, _in_text, out_buf)
             logger.info("[DeepSeek-R1] 流式迭代器完成")
 
         except httpx.TimeoutException as e:

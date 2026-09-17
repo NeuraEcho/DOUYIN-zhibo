@@ -30,6 +30,18 @@ class SpeechAdapterException(AdapterException):
         super().__init__(message, adapter_name="speech_28_turbo")
 
 
+class ElevenLabsAdapterException(AdapterException):
+    """ElevenLabs TTS 适配器异常（Key 无效 / 配额耗尽 / 网络不可达 / 音色不存在）"""
+    def __init__(self, message: str):
+        super().__init__(message, adapter_name="elevenlabs")
+
+
+class ObsAdapterException(AdapterException):
+    """obs-websocket 适配器异常（连不上 OBS / 鉴权失败 / 请求被拒）"""
+    def __init__(self, message: str):
+        super().__init__(message, adapter_name="obs_websocket")
+
+
 class SchedulerException(BaseLiveException):
     """调度层异常（事件总线、会话管理、抢占中断）"""
     def __init__(self, message: str):

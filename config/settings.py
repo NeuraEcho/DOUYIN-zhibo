@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 from dotenv import load_dotenv
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # 强制用 .env 文件覆盖系统环境变量（解决系统环境变量残留旧值问题）
@@ -58,6 +58,49 @@ class VolcengineSettings(BaseSettings):
     emotion_enabled: bool = True              # 是否下发整体情绪指令 context_texts
     context_text: str = "专业电商主播，情绪自然起伏，口语松弛，真人直播节奏，不要机器感，不要播音腔"  # 整体情绪/全局语音指令（预置 + 复刻2.0 音色均生效）
     block_gap: float = 0.3                    # 分片之间的静音间隔秒数（模拟真人换气），0 关闭
+
+
+class ElevenLabsSettings(BaseSettings):
+    """ElevenLabs TTS 配置（REST 流式接口 /v1/text-to-speech/{voice_id}/stream）
+
+    音频契约（不满足则下游播放变噪声/变调，适配器会在合成前硬拦）：
+    - output_format 只能是 pcm_*：AudioPlayer 按 16-bit 单声道裸 PCM 消费，mp3/opus 会变噪声
+    - sample_rate 由 output_format 自动推导，需与 AUDIO_SAMPLE_RATE 保持一致
+    - pcm_44100 需 ElevenLabs Pro 及以上套餐，默认 pcm_24000 规避该门槛
+    """
+    model_config = SettingsConfigDict(env_prefix="ELEVENLABS_", env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    api_key: str = ""                            # xi-api-key，控制台 API Keys 页获取
+    base_url: str = "https://api.elevenlabs.io"  # 国内直连不通时可改成自建中转地址
+    voice: str = "21m00Tcm4TlvDq8ikWAM"          # 默认音色 ID（Rachel）；建议在后台音色列表改选
+    model_id: str = "eleven_multilingual_v2"     # 中文必须 multilingual 系列或 flash_v2_5
+    language_code: str = ""                      # ISO 639-1；multilingual_v2 不支持此参数，留空
+    output_format: str = "pcm_24000"             # 必须是 pcm_*
+    sample_rate: int = 24000                     # 由 output_format 自动同步，无需手填
+
+    # ===== voice_settings（0-1）=====
+    stability: float = 0.45          # 略低 → 情绪起伏更丰富，直播听感更像真人
+    similarity_boost: float = 0.8    # 音色相似度
+    style: float = 0.0               # >0 明显增加延迟，直播建议保持 0
+    use_speaker_boost: bool = True   # 提升音色相似度，略增延迟
+    speed: float = 0.95              # 略慢更自然，与 MiniMax / 火山口径一致
+
+    apply_text_normalization: str = "auto"   # auto / on / off
+    timeout: float = 60.0                    # 单次合成总超时（秒）
+    connect_timeout: float = 10.0            # 建连超时（秒）
+    max_retries: int = 2                     # 429 限流 / 5xx / 网络抖动的重试次数
+
+    @model_validator(mode="after")
+    def _sync_sample_rate_from_format(self):
+        """采样率以 output_format 为唯一事实来源，避免两处配置不一致导致播放变调变速"""
+        fmt = (self.output_format or "").strip().lower()
+        self.output_format = fmt
+        if fmt.startswith("pcm_"):
+            try:
+                self.sample_rate = int(fmt.split("_", 1)[1])
+            except (IndexError, ValueError):
+                pass
+        return self
 
 
 class WebSettings(BaseSettings):
@@ -115,6 +158,18 @@ class DanmakuSettings(BaseSettings):
         return [kw.strip() for kw in self.interrupt_keywords.split(",") if kw.strip()]
 
 
+class ObsSettings(BaseSettings):
+    """OBS 推流控制配置（obs-websocket v5 协议，OBS 28+ 内置，无需额外装插件）"""
+    model_config = SettingsConfigDict(env_prefix="OBS_", env_file=".env", env_file_encoding="utf-8", extra="ignore")
+
+    enabled: bool = True                       # 总开关：False 时后台 OBS 卡片提示未启用、接口直接拒绝
+    host: str = "127.0.0.1"                    # OBS 与后端同机时保持默认
+    port: int = 4455                           # obs-websocket 默认端口
+    password: str = ""                         # OBS「工具 → obs-websocket 设置」里的服务器密码；未开鉴权留空
+    timeout: float = 8.0                       # 单次「握手 + 请求」的总超时秒数
+    stream_service_type: str = "rtmp_custom"   # 直播伴侣发的是自定义推流地址，固定 rtmp_custom
+
+
 class QAInsertionSettings(BaseSettings):
     """预就绪伺机插入式打断续播配置（脚本播报中的弹幕问答插入）"""
     model_config = SettingsConfigDict(env_prefix="QA_", env_file=".env", env_file_encoding="utf-8", extra="ignore")
@@ -148,6 +203,7 @@ class Settings(BaseSettings):
     deepseek: DeepSeekSettings = Field(default_factory=DeepSeekSettings)
     speech: SpeechSettings = Field(default_factory=SpeechSettings)
     volcengine: VolcengineSettings = Field(default_factory=VolcengineSettings)
+    elevenlabs: ElevenLabsSettings = Field(default_factory=ElevenLabsSettings)
     web: WebSettings = Field(default_factory=WebSettings)
     live_room: LiveRoomSettings = Field(default_factory=LiveRoomSettings)
     audio: AudioSettings = Field(default_factory=AudioSettings)
@@ -155,6 +211,7 @@ class Settings(BaseSettings):
     log: LogSettings = Field(default_factory=LogSettings)
     danmaku: DanmakuSettings = Field(default_factory=DanmakuSettings)
     qa_insertion: QAInsertionSettings = Field(default_factory=QAInsertionSettings)
+    obs: ObsSettings = Field(default_factory=ObsSettings)
 
     # 主播默认人设 Prompt（基于真实开发者验证的最佳实践）
     default_system_prompt: str = Field(

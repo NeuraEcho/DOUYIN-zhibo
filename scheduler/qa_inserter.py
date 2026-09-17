@@ -162,9 +162,9 @@ class QAInserter:
             # 2) 分句 → 逐句 TTS 合成，收集完整音频分片
             sentences = _split_sentences(full_text)
             tts_adapter = create_tts_adapter()
-            # 应用运行时克隆音色（与 tts_synthesize.py 一致）
+            # 应用运行时克隆音色（与 tts_synthesize.py 一致：火山引擎 / ElevenLabs）
             from web.routers.config_router import get_cloned_voice_id, get_tts_provider
-            if get_tts_provider() == "volcengine":
+            if get_tts_provider() in ("volcengine", "elevenlabs"):
                 cloned = get_cloned_voice_id()
                 if cloned:
                     tts_adapter.set_cloned_voice(cloned)

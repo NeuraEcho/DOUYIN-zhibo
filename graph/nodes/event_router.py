@@ -21,7 +21,8 @@ def event_router(state: LiveState) -> dict:
 
     if source == "timer":
         mode = RunMode.SCRIPT_AUTO
-    elif source == "danmaku":
+    elif source in ("danmaku", "channels"):
+        # danmaku=抖音弹幕；channels=视频号弹幕（wxlivespy 转发）→ 同走问答链路
         mode = RunMode.DANMAKU_REPLY
     elif source == "manual":
         mode = RunMode.MANUAL_INPUT

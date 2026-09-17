@@ -20,7 +20,10 @@ env/
 *.swo
 
 # 环境变量（包含密钥，不提交）
+# 注意 .env.* 会连带忽略 .env.bak-xxx 之类的备份副本，只放行模板文件
 .env
+.env.*
+!.env.example
 
 # 日志
 logs/
@@ -39,10 +42,19 @@ htmlcov/
 Thumbs.db
 
 # 运行时数据（克隆音色 / 商品知识库等，各账号不同，不提交）
+# 只放行 .example.json 模板，保证克隆后商品问答功能有开箱示例
 data/*.json
+!data/*.example.json
 
-# 生成产物
-output/
+# 生成产物（音频缓存 / 临时导出）
+# ⚠️ 不要写成 output/ —— output/ 目录是核心音频源码（audio_queue / audio_player /
+#    virtual_sound_card），整目录忽略会导致别人 clone 下来直接 ImportError
+*.wav
+*.mp3
+*.pcm
+*.flv
+tmp/
+temp/
 
 # 临时调试脚本
 _test_*.py

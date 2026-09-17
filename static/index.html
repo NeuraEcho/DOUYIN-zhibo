@@ -95,6 +95,83 @@
                 </div>
                 <div id="loopStatus" class="text-xs text-gray-400 mt-2"></div>
             </div>
+
+            <!-- OBS 推流控制 -->
+            <div class="mt-6 bg-white rounded-xl shadow-sm border p-5">
+                <div class="flex items-center justify-between mb-2">
+                    <h2 class="text-sm font-semibold text-gray-700">🎥 OBS 推流控制</h2>
+                    <div class="flex items-center gap-2">
+                        <span id="obsDot" class="pulse-dot idle"></span>
+                        <span id="obsConnText" class="text-xs text-gray-400">未检测</span>
+                        <button onclick="loadObsStatus()" class="text-xs text-blue-500 hover:underline">刷新</button>
+                    </div>
+                </div>
+                <p class="text-xs text-gray-400 mb-3">通过 obs-websocket 远程控制 OBS：填推流地址/推流码、切场景、开始推流。需 OBS 28+，并在「工具 → obs-websocket 设置」里勾选「启用 obs-websocket」。</p>
+                <div class="bg-amber-50 border border-amber-200 rounded-lg p-2 mb-3">
+                    <p class="text-[11px] text-amber-700 leading-relaxed">🔊 OBS 里加一个「音频输入采集」源，设备选 <b>CABLE Output (VB-Audio Virtual Cable)</b>，本项目的声音就进 OBS 了；画面源自行添加（图片 / 视频 / 屏幕采集均可）。</p>
+                </div>
+
+                <!-- 连接配置（折叠） -->
+                <details class="mb-3">
+                    <summary class="text-xs text-gray-500 cursor-pointer select-none">obs-websocket 连接设置</summary>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mt-2">
+                        <div>
+                            <label class="block text-[11px] text-gray-500 mb-1">主机</label>
+                            <input id="obsHost" type="text" value="127.0.0.1" class="w-full border rounded-lg px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-blue-200">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-gray-500 mb-1">端口</label>
+                            <input id="obsPort" type="number" value="4455" class="w-full border rounded-lg px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-blue-200">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] text-gray-500 mb-1">服务器密码（留空=不改）</label>
+                            <input id="obsPassword" type="password" placeholder="未开鉴权可不填" class="w-full border rounded-lg px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-blue-200">
+                        </div>
+                        <div class="flex items-end gap-2">
+                            <label class="flex items-center gap-1 text-[11px] text-gray-500 pb-2">
+                                <input type="checkbox" id="obsEnabled" checked class="rounded">启用
+                            </label>
+                            <button onclick="saveObsConfig()" class="bg-gray-600 hover:bg-gray-700 text-white text-xs px-3 py-1.5 rounded-lg transition">保存</button>
+                        </div>
+                    </div>
+                </details>
+
+                <!-- 实时状态 -->
+                <div id="obsStatus" class="grid grid-cols-2 md:grid-cols-4 gap-2 mb-2"></div>
+                <div id="obsStreamService" class="text-[11px] text-gray-400 mb-3"></div>
+
+                <!-- 推流地址 + 推流码 -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">推流地址（RTMP）</label>
+                        <input id="obsServer" type="text" placeholder="rtmp://...（直播伴侣→推流设置里复制）" class="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-gray-500 mb-1">推流码</label>
+                        <input id="obsKey" type="text" placeholder="直播伴侣给的推流码" class="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200">
+                    </div>
+                </div>
+
+                <!-- 场景 -->
+                <div class="mt-3">
+                    <label class="block text-xs text-gray-500 mb-1">场景</label>
+                    <select id="obsScene" class="w-full border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-200">
+                        <option value="">不切换场景</option>
+                    </select>
+                </div>
+
+                <div class="flex gap-2 mt-3">
+                    <button onclick="obsOneClick()" class="flex-1 bg-green-500 hover:bg-green-600 text-white text-sm font-medium py-2 rounded-lg transition">一键开播（填码+切场景+推流）</button>
+                    <button onclick="obsStreamStart()" class="flex-1 bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium py-2 rounded-lg transition">开始推流</button>
+                    <button onclick="obsStreamStop()" class="flex-1 bg-red-500 hover:bg-red-600 text-white text-sm font-medium py-2 rounded-lg transition">停止推流</button>
+                </div>
+                <div class="flex gap-2 mt-2">
+                    <button onclick="obsSaveStreamService()" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs py-1.5 rounded-lg transition">只保存推流地址/推流码</button>
+                    <button onclick="obsSwitchScene()" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs py-1.5 rounded-lg transition">只切场景</button>
+                    <button onclick="obsTestConn()" class="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs py-1.5 rounded-lg transition">测试连接</button>
+                </div>
+                <div id="obsLog" class="text-xs text-gray-400 mt-2"></div>
+            </div>
         </div>
 
         <!-- ===== 试听试播 ===== -->
@@ -297,10 +374,38 @@
                     </div>
                 </div>
             </div>
+
+            <!-- ElevenLabs 音色浏览（在线拉取账号可用音色，含官网创建的克隆音色） -->
+            <div id="elVoiceContent" class="hidden">
+                <div class="bg-white rounded-xl shadow-sm border p-5">
+                    <div class="bg-purple-50 rounded-lg p-3 mb-4">
+                        <p class="text-xs text-purple-700 leading-relaxed">列表从 <b>GET /v1/voices</b> 在线拉取，包含官方预置音色<b>以及你在 elevenlabs.io 官网创建的克隆音色</b>（IVC / PVC）。<br>声音克隆涉及音频上传与声音授权，请到 <a href="https://elevenlabs.io/app/voice-library" target="_blank" class="underline font-medium">elevenlabs.io 官网</a>完成，克隆好后回这里点「刷新在线列表」即可看到。<br>接口不可达（未配 Key / 国内网络不通）时会回退到内置预置音色表，此时选中可能返回 404。</p>
+                    </div>
+                    <div class="flex items-center justify-between mb-3">
+                        <h2 class="text-sm font-semibold text-gray-700">🎧 可用音色 <span id="elVoiceCount" class="text-xs font-normal text-gray-400"></span></h2>
+                        <div class="flex gap-3">
+                            <button onclick="loadElevenLabsVoices(true)" class="text-xs text-purple-500 hover:text-purple-700">刷新在线列表</button>
+                        </div>
+                    </div>
+                    <div id="elVoiceList" class="space-y-2 max-h-[32rem] overflow-y-auto">
+                        <p class="text-xs text-gray-400 text-center py-4">加载中...</p>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- ===== 配置管理 ===== -->
         <div id="panel-config" class="tab-panel hidden fade-in">
+            <!-- 直播间号 ROOM_ID（运行时热更新 + 写回 .env + 弹幕监听自动重连） -->
+            <div class="bg-white rounded-xl shadow-sm border p-5 mb-6">
+                <h2 class="text-sm font-semibold text-gray-700 mb-1">直播间号 (ROOM_ID)</h2>
+                <p class="text-[11px] text-gray-400 mb-3">修改后<b>运行时立即生效</b>：弹幕监听会用新房间号自动重连，并写回 <code class="bg-gray-100 px-1 rounded">.env</code>（重启保留）。房间号取自浏览器 <code class="bg-gray-100 px-1 rounded">live.douyin.com/xxxxx</code> 中的数字串。</p>
+                <div class="flex gap-2">
+                    <input id="roomIdInput" type="text" placeholder="例如：462632838422" class="flex-1 border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-200 outline-none">
+                    <button onclick="saveRoomId()" class="bg-blue-500 hover:bg-blue-600 text-white text-sm font-medium px-4 py-2 rounded-lg transition whitespace-nowrap">保存并重连</button>
+                </div>
+                <p class="text-[11px] text-gray-400 mt-2">当前 WebSocket 服务地址：<span id="roomIdWsUrl" class="text-gray-500">-</span></p>
+            </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <!-- 人设 Prompt -->
                 <div class="bg-white rounded-xl shadow-sm border p-5">
@@ -319,6 +424,7 @@
                             <div class="flex gap-2">
                                 <button id="btnMiniMax" onclick="switchTTSProvider('minimax')" class="flex-1 text-xs py-2 rounded-lg border transition font-medium">MiniMax Speech-2.8</button>
                                 <button id="btnVolcengine" onclick="switchTTSProvider('volcengine')" class="flex-1 text-xs py-2 rounded-lg border transition font-medium">火山引擎 Seed-TTS</button>
+                                <button id="btnElevenLabs" onclick="switchTTSProvider('elevenlabs')" class="flex-1 text-xs py-2 rounded-lg border transition font-medium">ElevenLabs</button>
                             </div>
                         </div>
                         <div id="ttsConfig" class="text-xs text-gray-500 space-y-1">
@@ -330,6 +436,19 @@
                             <textarea id="contextText" rows="3" placeholder="例如：专业电商主播，情绪自然起伏，口语松弛，真人直播节奏，不要机器感" class="w-full border rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-orange-200 outline-none resize-none"></textarea>
                             <p class="text-[11px] text-gray-400 mt-1">合成时作为全局语音指令下发，预置音色与复刻音色均生效；留空则不下发。稿子将直接使用，不做任何 Agent 改写。</p>
                             <button onclick="updateContextText()" class="w-full mt-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-medium py-2 rounded-lg transition">保存语言指令</button>
+                        </div>
+                        <!-- ElevenLabs：模型选择（model_id 选错是 422 报错首因，做成在线可选列表） -->
+                        <div id="elevenlabsConfigGroup" class="mt-3" style="display:none;">
+                            <label class="block text-xs text-gray-500 mb-1">🎧 TTS 模型（ElevenLabs）</label>
+                            <div class="flex gap-2">
+                                <select id="elModelId" class="flex-1 border rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-purple-200 outline-none bg-white">
+                                    <option value="">加载中...</option>
+                                </select>
+                                <button onclick="loadElevenLabsModels(true)" class="text-xs text-purple-500 hover:text-purple-700 px-2 whitespace-nowrap">刷新</button>
+                            </div>
+                            <p id="elModelHint" class="text-[11px] text-gray-400 mt-1"></p>
+                            <p class="text-[11px] text-gray-400 mt-1">中文带货必须选 <b>Multilingual v2</b> 或 <b>Flash v2.5</b>；Turbo v2.5 / Monolingual v1 不支持中文。列表取自 <code class="bg-gray-100 px-1 rounded">GET /v1/models</code>，只列出你套餐真正可用的模型。</p>
+                            <button onclick="saveElevenLabsModel()" class="w-full mt-2 bg-purple-500 hover:bg-purple-600 text-white text-xs font-medium py-2 rounded-lg transition">保存模型</button>
                         </div>
                     </div>
                     <div class="border-t pt-4">
@@ -420,6 +539,62 @@
                     <p>等待日志加载...</p>
                 </div>
             </div>
+
+            <!-- 实时观众昵称池（真实互动自动采集，供随机点名 / 回答带昵称） -->
+            <div class="mt-6 bg-white rounded-xl shadow-sm border p-5">
+                <div class="flex items-center justify-between mb-1">
+                    <h2 class="text-sm font-semibold text-gray-700">实时观众昵称池</h2>
+                    <div class="flex items-center gap-3">
+                        <label class="flex items-center gap-1 text-[11px] text-gray-400 cursor-pointer">
+                            <input id="viewerPoolAuto" type="checkbox" checked onchange="toggleViewerPoolPoll()"> 自动刷新
+                        </label>
+                        <button onclick="loadViewerPool()" class="text-xs text-blue-500 hover:text-blue-700">刷新</button>
+                        <button onclick="clearViewerPool()" class="text-xs text-red-500 hover:text-red-700">清空</button>
+                    </div>
+                </div>
+                <p class="text-[11px] text-gray-400 mb-3">连上直播间后，观众发弹幕 / 进场 / 送礼的<b>真实昵称</b>会自动入池（最多 <span id="vpMaxlen">50</span> 条，滚动淘汰、不会卡顿），供口播稿 <code class="bg-gray-100 px-1 rounded">{点名}</code> 与弹幕回答带昵称使用。</p>
+                <div id="viewerPoolStats" class="text-xs text-gray-500 mb-2">检测中...</div>
+                <div id="viewerPoolNames" class="flex flex-wrap gap-2">
+                    <span class="text-xs text-gray-400">等待观众互动...</span>
+                </div>
+                <div id="viewerPoolFallback" class="text-[11px] text-gray-400 mt-3"></div>
+            </div>
+
+            <!-- 成本 / 用量监控（实时累计 TTS 字符 + LLM token，估算费用） -->
+            <div class="mt-6 bg-white rounded-xl shadow-sm border p-5">
+                <div class="flex items-center justify-between mb-1">
+                    <h2 class="text-sm font-semibold text-gray-700">成本 / 用量监控</h2>
+                    <div class="flex items-center gap-3">
+                        <label class="flex items-center gap-1 text-[11px] text-gray-400 cursor-pointer">
+                            <input id="usageAuto" type="checkbox" checked onchange="toggleUsagePoll()"> 自动刷新
+                        </label>
+                        <button onclick="loadUsage()" class="text-xs text-blue-500 hover:text-blue-700">刷新</button>
+                        <button onclick="resetUsage()" class="text-xs text-red-500 hover:text-red-700">清零</button>
+                    </div>
+                </div>
+                <p class="text-[11px] text-gray-400 mb-3">循环口播只走 TTS（旁路大模型），故成本≈语音合成字符数；弹幕问答才额外产生少量 LLM 费用。单价以各厂商控制台为准，可在 <code class="bg-gray-100 px-1 rounded">scheduler/usage_tracker.py</code> 的 PRICING 调整。</p>
+                <div id="usageSummary" class="text-xs text-gray-500 mb-3">检测中...</div>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-center">
+                    <div class="bg-gray-50 rounded-lg p-3">
+                        <div class="text-[11px] text-gray-400">运行时长</div>
+                        <div id="usageElapsed" class="text-sm font-semibold text-gray-700">-</div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-3">
+                        <div class="text-[11px] text-gray-400">TTS 计费字符</div>
+                        <div id="usageTtsChars" class="text-sm font-semibold text-gray-700">-</div>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-3">
+                        <div class="text-[11px] text-gray-400">LLM 调用 / tokens</div>
+                        <div id="usageLlm" class="text-sm font-semibold text-gray-700">-</div>
+                    </div>
+                    <div class="bg-green-50 rounded-lg p-3">
+                        <div class="text-[11px] text-gray-400">累计费用</div>
+                        <div id="usageTotal" class="text-sm font-semibold text-green-600">-</div>
+                    </div>
+                </div>
+                <div id="usageDetail" class="text-[11px] text-gray-400 mt-3"></div>
+                <div id="usageProject" class="text-xs text-gray-600 mt-2"></div>
+            </div>
         </div>
     </main>
 
@@ -435,7 +610,10 @@
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('tab-active'));
         document.getElementById('panel-' + name).classList.remove('hidden');
         document.getElementById('tab-' + name).classList.add('tab-active');
-        if (name === 'monitor') loadMonitor();
+        if (name === 'monitor') { loadMonitor(); startViewerPoolPoll(); startUsagePoll(); }
+        else { stopViewerPoolPoll(); stopUsagePoll(); }
+        if (name === 'control') { loadObsStatus(); startObsPoll(); }
+        else { stopObsPoll(); }
         if (name === 'config') loadConfig();
         if (name === 'voice') loadVoicePanel();
         if (name === 'preview') { loadPreviewVoices(); updateEnrichVisibility(); }
@@ -541,6 +719,137 @@
         }
     }
 
+    // ===== OBS 推流控制 =====
+    let _obsTimer = null;
+
+    function _obsEsc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    function _obsSetConn(connected, text) {
+        document.getElementById('obsDot').className = 'pulse-dot ' + (connected ? 'live' : 'idle');
+        const el = document.getElementById('obsConnText');
+        el.textContent = text;
+        el.className = 'text-xs ' + (connected ? 'text-green-600 font-medium' : 'text-gray-400');
+    }
+
+    function _obsCell(label, value, color = 'text-gray-700') {
+        return `<div class="bg-gray-50 rounded-lg p-2 text-center">
+            <div class="text-[11px] text-gray-400">${label}</div>
+            <div class="text-xs font-semibold ${color}">${value}</div>
+        </div>`;
+    }
+
+    async function loadObsStatus() {
+        try {
+            const data = await api('GET', '/api/obs/status');
+            // 回填连接配置（密码不回传，只反映是否已设置）
+            document.getElementById('obsHost').value = data.host || '127.0.0.1';
+            document.getElementById('obsPort').value = data.port || 4455;
+            document.getElementById('obsEnabled').checked = !!data.enabled;
+            document.getElementById('obsPassword').placeholder = data.password_set ? '已设置（留空不改）' : '未开鉴权可不填';
+
+            const statusEl = document.getElementById('obsStatus');
+            const svcEl = document.getElementById('obsStreamService');
+
+            if (!data.connected) {
+                _obsSetConn(false, '未连接');
+                statusEl.innerHTML = `<div class="col-span-2 md:col-span-4 text-[11px] text-red-500 bg-red-50 rounded-lg p-2">${_obsEsc(data.error || '连不上 OBS')}</div>`;
+                svcEl.textContent = '';
+                return;
+            }
+
+            _obsSetConn(true, `已连接 OBS ${data.obs_version || ''}`);
+            statusEl.innerHTML =
+                _obsCell('推流状态', data.streaming ? (data.reconnecting ? '重连中' : '推流中') : '未推流',
+                    data.streaming ? (data.reconnecting ? 'text-amber-500' : 'text-green-600') : 'text-gray-500') +
+                _obsCell('已播时长', _obsEsc(data.timecode || '00:00:00')) +
+                _obsCell('当前场景', _obsEsc(data.current_scene || '-')) +
+                _obsCell('丢帧/总帧', `${data.skipped_frames || 0}/${data.total_frames || 0}`);
+            svcEl.innerHTML = `推流地址：<span class="text-gray-600">${_obsEsc(data.server || '未设置')}</span>` +
+                `　推流码：<span class="text-gray-600">${_obsEsc(data.key_masked || '未设置')}</span>`;
+
+            // 场景下拉：重建选项但尽量保留当前选中
+            const sel = document.getElementById('obsScene');
+            const prev = sel.value;
+            const scenes = data.scenes || [];
+            sel.innerHTML = '<option value="">不切换场景</option>' +
+                scenes.map(n => `<option value="${_obsEsc(n)}">${_obsEsc(n)}</option>`).join('');
+            if (scenes.includes(prev)) sel.value = prev;
+            else if (scenes.includes(data.current_scene)) sel.value = data.current_scene;
+
+            // 推流地址输入框为空时用 OBS 里的现值兜底（不覆盖用户正在输入的内容）
+            const serverEl = document.getElementById('obsServer');
+            if (!serverEl.value && data.server) serverEl.value = data.server;
+        } catch (e) {
+            _obsSetConn(false, '未连接');
+        }
+    }
+
+    async function _obsCall(method, path, body, okMsg) {
+        const log = document.getElementById('obsLog');
+        log.innerHTML = '<span class="text-blue-500">处理中...</span>';
+        try {
+            const data = await api(method, path, body);
+            if (data.status === 'ok') {
+                log.innerHTML = `<span class="text-green-600">✅ ${_obsEsc(data.message || okMsg)}</span>`;
+                toast(data.message || okMsg, 'success');
+            } else {
+                log.innerHTML = `<span class="text-red-500">❌ ${_obsEsc(data.message || '操作失败')}</span>`;
+                toast(data.message || '操作失败', 'error');
+            }
+        } catch (e) {
+            log.innerHTML = `<span class="text-red-500">❌ ${_obsEsc(e.message)}</span>`;
+            toast(e.message, 'error');
+        }
+        loadObsStatus();
+    }
+
+    function _obsStreamServiceBody() {
+        return {
+            server: document.getElementById('obsServer').value.trim(),
+            key: document.getElementById('obsKey').value.trim(),
+        };
+    }
+
+    async function saveObsConfig() {
+        const pwd = document.getElementById('obsPassword').value;
+        const body = {
+            host: document.getElementById('obsHost').value.trim(),
+            port: parseInt(document.getElementById('obsPort').value, 10) || 4455,
+            enabled: document.getElementById('obsEnabled').checked,
+        };
+        if (pwd) body.password = pwd;   // 留空表示不改密码
+        await _obsCall('POST', '/api/obs/config', body, '连接配置已保存');
+        document.getElementById('obsPassword').value = '';
+    }
+
+    function obsTestConn() { _obsCall('POST', '/api/obs/test', null, '连接正常'); }
+    function obsStreamStart() { _obsCall('POST', '/api/obs/stream/start', null, 'OBS 已开始推流'); }
+    function obsStreamStop() { _obsCall('POST', '/api/obs/stream/stop', null, 'OBS 已停止推流'); }
+
+    function obsSaveStreamService() {
+        const b = _obsStreamServiceBody();
+        if (!b.server && !b.key) return toast('请先填推流地址或推流码', 'error');
+        _obsCall('POST', '/api/obs/stream-service', b, '推流地址/推流码已写入 OBS');
+    }
+
+    function obsSwitchScene() {
+        const name = document.getElementById('obsScene').value;
+        if (!name) return toast('请先选择场景', 'error');
+        _obsCall('POST', '/api/obs/scene', { scene_name: name }, '场景已切换');
+    }
+
+    function obsOneClick() {
+        const b = _obsStreamServiceBody();
+        b.scene_name = document.getElementById('obsScene').value;
+        b.start_stream = true;
+        _obsCall('POST', '/api/obs/one-click', b, '一键开播完成');
+    }
+
+    function startObsPoll() { if (!_obsTimer) _obsTimer = setInterval(loadObsStatus, 5000); }
+    function stopObsPoll() { if (_obsTimer) { clearInterval(_obsTimer); _obsTimer = null; } }
+
     // ===== 音色克隆 =====
     async function cloneVoice() {
         const name = document.getElementById('voiceName').value.trim();
@@ -637,21 +946,23 @@
             currentProvider = ttsConfig.provider || 'minimax';
             updateEnrichVisibility();
             const isVolcengine = currentProvider === 'volcengine';
+            const isElevenLabs = currentProvider === 'elevenlabs';
+            const isMiniMax = !isVolcengine && !isElevenLabs;
 
             // 并行加载系统音色 + 对应 provider 的克隆/复刻音色
             const [sysData, clonedData, volcClonedData] = await Promise.all([
                 api('GET', '/api/voice-clone/system-voices'),
-                isVolcengine ? Promise.resolve({ voices: [] }) : api('GET', '/api/voice-clone/voices'),
+                isMiniMax ? api('GET', '/api/voice-clone/voices') : Promise.resolve({ voices: [] }),
                 isVolcengine ? api('GET', '/api/voice-clone/volcengine/voices') : Promise.resolve({ voices: [] }),
             ]);
             const selectors = ['previewTtsVoice', 'testBroadcastVoice', 'simDanmakuVoice'];
-            const defaultLabel = isVolcengine
-                ? '默认音色 (' + (ttsConfig.voice || '预置') + ')'
+            const defaultLabel = (isVolcengine || isElevenLabs)
+                ? '默认音色 (' + (ttsConfig.voice || '未设置') + ')'
                 : '默认音色 (female-shaonv)';
             selectors.forEach(id => {
                 const sel = document.getElementById(id);
                 sel.innerHTML = `<option value="">${defaultLabel}</option>`;
-                // 系统音色 - 按分组展示
+                // 系统音色 - 按分组展示（/system-voices 已按当前 provider 返回对应厂商的音色）
                 if (sysData.voices) {
                     for (const [group, voices] of Object.entries(sysData.voices)) {
                         if (voices.length === 0) continue;
@@ -666,8 +977,8 @@
                         sel.appendChild(optgroup);
                     }
                 }
-                // MiniMax 克隆音色
-                if (!isVolcengine && clonedData.voices && clonedData.voices.length > 0) {
+                // MiniMax 克隆音色（仅 MiniMax：克隆 ID 不跨厂商通用）
+                if (isMiniMax && clonedData.voices && clonedData.voices.length > 0) {
                     const optgroup = document.createElement('optgroup');
                     optgroup.label = '克隆音色 (' + clonedData.voices.length + ')';
                     clonedData.voices.forEach(v => {
@@ -712,14 +1023,18 @@
         const text = document.getElementById('previewTtsText').value.trim();
         if (!text) return toast('请输入试听文本', 'error');
         const voiceId = document.getElementById('previewTtsVoice').value;
-        const enrich = currentProvider !== 'volcengine' && document.getElementById('previewTtsEnrich').checked;
+        const isDirect = isDirectSynthProvider();
+        const enrich = !isDirect && document.getElementById('previewTtsEnrich').checked;
         const btn = document.getElementById('btnPreviewTts');
         const status = document.getElementById('previewTtsStatus');
         const audio = document.getElementById('previewTtsAudio');
 
-        const isVolc = currentProvider === 'volcengine';
-        btn.disabled = true; btn.textContent = isVolc ? '合成中...' : (enrich ? '标注中...' : '合成中...');
-        status.textContent = isVolc ? '正在用原稿直接合成（整体语言指令已生效）...' : (enrich ? '正在进行口语化标注 + TTS 合成...' : '正在调用 TTS 合成...');
+        btn.disabled = true; btn.textContent = isDirect ? '合成中...' : (enrich ? '标注中...' : '合成中...');
+        status.textContent = isDirect
+            ? (currentProvider === 'elevenlabs'
+                ? '正在用原稿直接合成（语气由 voice_settings 控制）...'
+                : '正在用原稿直接合成（整体语言指令已生效）...')
+            : (enrich ? '正在进行口语化标注 + TTS 合成...' : '正在调用 TTS 合成...');
         try {
             const data = await api('POST', '/api/preview/tts-preview', { text, voice_id: voiceId || null, enrich });
             if (data.status === 'ok' && data.audio_base64) {
@@ -840,16 +1155,43 @@
     // ===== 配置管理 =====
     let currentProvider = 'minimax';
 
+    // 直接用原稿合成的厂商：口语化标注会注入 MiniMax 专属的 (breath)/(chuckle) 标签，
+    // 火山与 ElevenLabs 都不识别，会被当正文念出来，故对这两家隐藏标注开关。
+    const DIRECT_SYNTH_PROVIDERS = ['volcengine', 'elevenlabs'];
+    function isDirectSynthProvider() { return DIRECT_SYNTH_PROVIDERS.includes(currentProvider); }
+
+    const PROVIDER_LABELS = {
+        minimax: 'MiniMax Speech-2.8',
+        volcengine: '火山引擎 Seed-TTS',
+        elevenlabs: 'ElevenLabs',
+    };
+
     function updateProviderButtons(provider) {
-        const btnMini = document.getElementById('btnMiniMax');
-        const btnVolc = document.getElementById('btnVolcengine');
-        if (provider === 'minimax') {
-            btnMini.className = 'flex-1 text-xs py-2 rounded-lg border-2 border-blue-500 bg-blue-50 text-blue-600 transition font-medium';
-            btnVolc.className = 'flex-1 text-xs py-2 rounded-lg border border-gray-200 text-gray-500 hover:border-blue-300 transition font-medium';
-        } else {
-            btnVolc.className = 'flex-1 text-xs py-2 rounded-lg border-2 border-orange-500 bg-orange-50 text-orange-600 transition font-medium';
-            btnMini.className = 'flex-1 text-xs py-2 rounded-lg border border-gray-200 text-gray-500 hover:border-orange-300 transition font-medium';
-        }
+        const styles = {
+            minimax: {
+                active: 'flex-1 text-xs py-2 rounded-lg border-2 border-blue-500 bg-blue-50 text-blue-600 transition font-medium',
+                hover: 'flex-1 text-xs py-2 rounded-lg border border-gray-200 text-gray-500 hover:border-blue-300 transition font-medium',
+            },
+            volcengine: {
+                active: 'flex-1 text-xs py-2 rounded-lg border-2 border-orange-500 bg-orange-50 text-orange-600 transition font-medium',
+                hover: 'flex-1 text-xs py-2 rounded-lg border border-gray-200 text-gray-500 hover:border-orange-300 transition font-medium',
+            },
+            elevenlabs: {
+                active: 'flex-1 text-xs py-2 rounded-lg border-2 border-purple-500 bg-purple-50 text-purple-600 transition font-medium',
+                hover: 'flex-1 text-xs py-2 rounded-lg border border-gray-200 text-gray-500 hover:border-purple-300 transition font-medium',
+            },
+        };
+        const btns = { minimax: 'btnMiniMax', volcengine: 'btnVolcengine', elevenlabs: 'btnElevenLabs' };
+        Object.keys(btns).forEach(key => {
+            const el = document.getElementById(btns[key]);
+            if (!el) return;
+            if (key === provider) {
+                el.className = styles[key].active;
+            } else {
+                // 未选中时用当前厂商的色系做 hover，避免三色混杂
+                el.className = styles[provider] ? styles[provider].hover : styles.minimax.hover;
+            }
+        });
     }
 
     async function switchTTSProvider(provider) {
@@ -859,61 +1201,200 @@
             currentProvider = provider;
             updateProviderButtons(provider);
             updateEnrichVisibility();
-            toast(`已切换到 ${provider === 'minimax' ? 'MiniMax' : '火山引擎'}`, 'success');
+            toast(`已切换到 ${PROVIDER_LABELS[provider] || provider}`, 'success');
             loadConfig();
             // 如果当前在试听页，刷新音色列表
             const previewPanel = document.getElementById('panel-preview');
             if (!previewPanel.classList.contains('hidden')) {
                 loadPreviewVoices();
             }
+            // 如果当前在音色克隆页，切到对应厂商的面板
+            const voicePanel = document.getElementById('panel-voice');
+            if (voicePanel && !voicePanel.classList.contains('hidden')) {
+                loadVoicePanel();
+            }
         } catch (e) { toast(e.message, 'error'); }
     }
 
-    // 根据当前 provider 更新口语化标注复选框的可见性
+    // 根据当前 provider 更新口语化标注复选框 / 厂商专属配置区的可见性
     function updateEnrichVisibility() {
+        const isDirect = isDirectSynthProvider();
         const isVolcengine = currentProvider === 'volcengine';
+        const isElevenLabs = currentProvider === 'elevenlabs';
         const enrichGroups = ['enrichGroup-preview'];
         enrichGroups.forEach(id => {
             const el = document.getElementById(id);
-            if (el) el.style.display = isVolcengine ? 'none' : 'flex';
+            if (el) el.style.display = isDirect ? 'none' : 'flex';
         });
         // 火山引擎「整体语言指令」输入区：仅火山引擎显示
         const ctxGroup = document.getElementById('contextTextGroup');
         if (ctxGroup) ctxGroup.style.display = isVolcengine ? 'block' : 'none';
+        // ElevenLabs「模型选择」区：仅 ElevenLabs 显示
+        const elGroup = document.getElementById('elevenlabsConfigGroup');
+        if (elGroup) elGroup.style.display = isElevenLabs ? 'block' : 'none';
         // 试听页 provider 提示条
         const hint = document.getElementById('previewProviderHint');
         if (hint) {
-            if (isVolcengine) {
+            if (isElevenLabs) {
+                hint.className = 'mb-4 rounded-lg p-3 text-sm font-medium bg-purple-50 text-purple-700 border border-purple-200';
+                hint.innerHTML = '🎧 当前使用 <b>ElevenLabs</b>：<b>直接使用原稿合成，不做任何 Agent 改写</b>；语气自然度由模型与 voice_settings（stability / similarity_boost）控制，中文请选 Multilingual v2 或 Flash v2.5';
+            } else if (isVolcengine) {
                 hint.className = 'mb-4 rounded-lg p-3 text-sm font-medium bg-orange-50 text-orange-700 border border-orange-200';
                 hint.innerHTML = '🔥 当前使用 <b>火山引擎 Seed-TTS 2.0 Expressive</b>：<b>直接使用原稿合成，不做任何 Agent 改写</b>；整体语气/情绪由「配置管理 → 整体语言指令」全局控制（预置 + 复刻音色均生效）';
-                hint.classList.remove('hidden');
             } else {
                 hint.className = 'mb-4 rounded-lg p-3 text-sm font-medium bg-blue-50 text-blue-700 border border-blue-200';
                 hint.innerHTML = '🎯 当前使用 <b>MiniMax Speech-2.8</b>，支持口语化标注（添加停顿/语气词/情感），让 TTS 合成更自然';
-                hint.classList.remove('hidden');
             }
+            hint.classList.remove('hidden');
         }
     }
 
     // 音色克隆面板 provider 感知
     function loadVoicePanel() {
         const isVolcengine = currentProvider === 'volcengine';
+        const isElevenLabs = currentProvider === 'elevenlabs';
         const hint = document.getElementById('voiceProviderHint');
         const content = document.getElementById('voiceCloneContent');
         const volcContent = document.getElementById('volcCloneContent');
-        if (isVolcengine) {
+        const elContent = document.getElementById('elVoiceContent');
+
+        if (content) content.style.display = (isVolcengine || isElevenLabs) ? 'none' : 'block';
+        if (volcContent) volcContent.classList.toggle('hidden', !isVolcengine);
+        if (elContent) elContent.classList.toggle('hidden', !isElevenLabs);
+
+        if (isElevenLabs) {
+            hint.className = 'mb-4 rounded-lg p-3 text-sm font-medium bg-purple-50 text-purple-700 border border-purple-200';
+            hint.innerHTML = '🎧 当前使用 <b>ElevenLabs</b>。下方列出你账号可用的全部音色（含官网创建的克隆音色），点「使用」即可对直播链路生效';
+            hint.classList.remove('hidden');
+            loadElevenLabsVoices(false);
+        } else if (isVolcengine) {
             hint.className = 'mb-4 rounded-lg p-3 text-sm font-medium bg-orange-50 text-orange-700 border border-orange-200';
             hint.innerHTML = '🔥 当前使用 <b>火山引擎 Seed-TTS</b>。声音复刻音色需先在控制台训练获取 speaker_id（S_ 开头），在下方查询状态后即可用于合成';
             hint.classList.remove('hidden');
-            if (content) content.style.display = 'none';
-            if (volcContent) volcContent.classList.remove('hidden');
             loadVolcVoices();
         } else {
             hint.classList.add('hidden');
-            if (content) content.style.display = 'block';
-            if (volcContent) volcContent.classList.add('hidden');
             loadVoices();
         }
+    }
+
+    // ===== ElevenLabs 音色 / 模型 =====
+    function playElDemo(url) {
+        if (!url) return;
+        const a = new Audio(url);
+        a.play().catch(() => toast('试听音频播放失败（官网预览链接可能需翻墙）', 'error'));
+    }
+
+    async function loadElevenLabsVoices(refresh) {
+        const list = document.getElementById('elVoiceList');
+        const countEl = document.getElementById('elVoiceCount');
+        if (!list) return;
+        list.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">正在拉取在线音色列表...</p>';
+        try {
+            const [data, tts] = await Promise.all([
+                api('GET', '/api/voice-clone/elevenlabs/voices' + (refresh ? '?refresh=true' : '')),
+                api('GET', '/api/config/tts').catch(() => ({})),
+            ]);
+            const groups = data.voices || {};
+            const names = Object.keys(groups);
+            const total = data.total || 0;
+            if (countEl) countEl.textContent = total ? `（共 ${total} 个）` : '';
+            if (!total) {
+                list.innerHTML = '<p class="text-xs text-gray-400 text-center py-4">未获取到音色：请确认已配置 ELEVENLABS_API_KEY 且网络可达 api.elevenlabs.io</p>';
+                return;
+            }
+            const current = tts.cloned_voice_id || '';
+            list.innerHTML = names.map(group => {
+                const items = (groups[group] || []).map(v => {
+                    const id = _escapeHtml(v.voice_id);
+                    const isCur = v.voice_id === current;
+                    const demo = v.preview_url
+                        ? `<button data-url="${_escapeHtml(v.preview_url)}" class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded hover:bg-gray-200">▶ 试听</button>`
+                        : '';
+                    const useBtn = isCur
+                        ? `<span class="text-xs bg-green-100 text-green-600 px-3 py-1 rounded font-medium">✓ 使用中</span>`
+                        : `<button onclick="useElevenLabsVoice('${id}')" class="text-xs bg-purple-500 text-white px-3 py-1 rounded hover:bg-purple-600">使用</button>`;
+                    const meta = [v.style, v.voice_id].filter(Boolean).map(_escapeHtml).join(' · ');
+                    return `
+                    <div class="p-3 rounded-lg ${isCur ? 'bg-purple-50 border border-purple-200' : 'bg-gray-50'}">
+                        <div class="flex items-center justify-between gap-2">
+                            <div class="min-w-0">
+                                <p class="text-sm font-medium text-gray-700 truncate">${_escapeHtml(v.name || v.voice_id)}</p>
+                                <p class="text-[11px] text-gray-400 font-mono truncate">${meta}</p>
+                            </div>
+                            <div class="flex gap-2 shrink-0">${demo}${useBtn}</div>
+                        </div>
+                    </div>`;
+                }).join('');
+                return `<div class="mb-3">
+                    <p class="text-[11px] font-semibold text-gray-500 mb-2 sticky top-0 bg-white py-1">${_escapeHtml(group)} (${(groups[group] || []).length})</p>
+                    <div class="space-y-2">${items}</div>
+                </div>`;
+            }).join('');
+            // 试听按钮统一用 data-url 绑定（URL 可能含 & 等字符，不适合写在 inline onclick 里）
+            list.querySelectorAll('button[data-url]').forEach(btn => {
+                btn.onclick = () => playElDemo(btn.dataset.url);
+            });
+        } catch (e) {
+            list.innerHTML = `<p class="text-xs text-red-400 text-center py-4">加载失败: ${_escapeHtml(e.message)}</p>`;
+            toast(e.message, 'error');
+        }
+    }
+
+    async function useElevenLabsVoice(voiceId) {
+        try {
+            await api('POST', '/api/voice-clone/elevenlabs/use', { voice_id: voiceId });
+            toast('已切换 ElevenLabs 音色', 'success');
+            loadElevenLabsVoices(false);   // 刷新「使用中」高亮
+            loadConfig();                  // 同步配置页展示的音色
+        } catch (e) { toast(e.message, 'error'); }
+    }
+
+    async function loadElevenLabsModels(refresh) {
+        const sel = document.getElementById('elModelId');
+        const hint = document.getElementById('elModelHint');
+        if (!sel) return;
+        // dataset.current 由 loadConfig 写入，刷新列表后仍保留当前生效模型
+        const want = sel.dataset.current || sel.value || '';
+        sel.innerHTML = '<option value="">加载中...</option>';
+        try {
+            const data = await api('GET', '/api/voice-clone/elevenlabs/models' + (refresh ? '?refresh=true' : ''));
+            const models = data.models || [];
+            if (!models.length) {
+                sel.innerHTML = '<option value="">未获取到可用模型</option>';
+                if (hint) hint.textContent = '';
+                return;
+            }
+            sel.innerHTML = models.map(m => {
+                const tag = m.supports_chinese ? '✅ 支持中文' : '❌ 不支持中文';
+                return `<option value="${_escapeHtml(m.model_id)}">${_escapeHtml((m.name || m.model_id) + '（' + m.model_id + '）· ' + tag)}</option>`;
+            }).join('');
+            if (want && models.some(m => m.model_id === want)) sel.value = want;
+            const cur = models.find(m => m.model_id === sel.value);
+            if (hint && cur) {
+                const parts = [cur.description, cur.language_count ? `支持 ${cur.language_count} 种语言` : ''];
+                if (!cur.supports_chinese) parts.push('⚠️ 该模型不支持中文，中文直播请勿选择');
+                hint.textContent = parts.filter(Boolean).join(' · ');
+                hint.className = cur.supports_chinese
+                    ? 'text-[11px] text-gray-400 mt-1'
+                    : 'text-[11px] text-red-500 mt-1 font-medium';
+            }
+        } catch (e) {
+            sel.innerHTML = '<option value="">加载失败</option>';
+            if (hint) hint.textContent = e.message;
+        }
+    }
+
+    async function saveElevenLabsModel() {
+        const sel = document.getElementById('elModelId');
+        const modelId = sel ? sel.value : '';
+        if (!modelId) return toast('请先选择模型', 'error');
+        try {
+            await api('PUT', '/api/config/elevenlabs', { model_id: modelId });
+            sel.dataset.current = modelId;
+            toast(`模型已切换为 ${modelId}（重启后恢复 .env 默认）`, 'success');
+            loadConfig();
+        } catch (e) { toast(e.message, 'error'); }
     }
 
     // ===== 火山引擎复刻音色 =====
@@ -1038,6 +1519,23 @@
                 `;
                 const ctxEl = document.getElementById('contextText');
                 if (ctxEl) ctxEl.value = tts.context_text || '';
+            } else if (currentProvider === 'elevenlabs') {
+                configHtml = `
+                    <p>服务商: <span class="text-purple-600 font-medium">ElevenLabs</span></p>
+                    <p>模型: <span class="text-gray-700">${tts.model}</span></p>
+                    <p>音色: <span class="text-gray-700">${tts.voice || '未设置'}</span></p>
+                    <p>输出格式: <span class="text-gray-700">${tts.encoding}（${tts.sample_rate}Hz 16bit 单声道）</span></p>
+                    <p>语速/稳定度/相似度: <span class="text-gray-700">${tts.speed} / ${tts.stability} / ${tts.similarity_boost}</span></p>
+                    <p>API Key: ${tts.api_key_set
+                        ? '<span class="text-green-600 font-medium">已配置</span>'
+                        : '<span class="text-red-500 font-medium">未配置（请在 .env 填 ELEVENLABS_API_KEY 后重启）</span>'}</p>
+                    <p>接口地址: <span class="text-gray-700">${tts.base_url}</span></p>
+                    ${tts.cloned_voice_id ? `<p>当前音色: <span class="text-purple-600 font-medium">${tts.cloned_voice_id}</span></p>` : ''}
+                `;
+                // 模型下拉：先把当前生效值记下来，再拉在线列表（保留选中）
+                const elSel = document.getElementById('elModelId');
+                if (elSel) elSel.dataset.current = tts.model || '';
+                loadElevenLabsModels(false);
             } else {
                 configHtml = `
                     <p>服务商: <span class="text-blue-600 font-medium">MiniMax Speech-2.8</span></p>
@@ -1048,6 +1546,7 @@
                 `;
             }
             document.getElementById('ttsConfig').innerHTML = configHtml;
+            loadRoomId();          // 加载直播间号 ROOM_ID
             loadDanmakuConfig();   // 同时加载弹幕过滤规则 + 点名兜底名称池
             loadProduct();         // 加载商品问答资料（商品信息 + 示例）
         } catch (e) { toast(e.message, 'error'); }
@@ -1059,6 +1558,29 @@
         try {
             await api('PUT', '/api/config/prompt', { system_prompt: text });
             toast('人设已更新', 'success');
+        } catch (e) { toast(e.message, 'error'); }
+    }
+
+    // ===== 直播间号 ROOM_ID（运行时热更新 + 写回 .env + 弹幕监听重连）=====
+    async function loadRoomId() {
+        try {
+            const data = await api('GET', '/api/config/room-id');
+            document.getElementById('roomIdInput').value = data.room_id || '';
+            const wsEl = document.getElementById('roomIdWsUrl');
+            if (wsEl) wsEl.textContent = data.ws_url || '（未配置 PLATFORM_WS_URL）';
+        } catch (e) { toast(e.message, 'error'); }
+    }
+
+    async function saveRoomId() {
+        const roomId = document.getElementById('roomIdInput').value.trim();
+        if (!roomId) return toast('直播间号不能为空', 'error');
+        try {
+            const data = await api('PUT', '/api/config/room-id', { room_id: roomId, reconnect: true });
+            if (data.status === 'ok') {
+                toast(data.message || '直播间号已更新', 'success');
+            } else {
+                toast(data.message || '更新失败', 'error');
+            }
         } catch (e) { toast(e.message, 'error'); }
     }
 
@@ -1223,6 +1745,124 @@
         }
     }
 
+    // ===== 实时观众昵称池（监控看板，可自动轮询）=====
+    let _viewerPoolTimer = null;
+
+    function _escapeVp(s) {
+        return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+
+    async function loadViewerPool() {
+        try {
+            const data = await api('GET', '/api/config/viewer-pool');
+            const maxlen = data.maxlen || 50;
+            document.getElementById('vpMaxlen').textContent = maxlen;
+            document.getElementById('viewerPoolStats').innerHTML =
+                `真实互动：<span class="font-medium text-green-600">${data.real_unique || 0}</span> 位观众` +
+                `（累计 ${data.real_total || 0} 条互动 / 上限 ${maxlen}，滚动淘汰）`;
+            const namesEl = document.getElementById('viewerPoolNames');
+            if (data.real_names && data.real_names.length > 0) {
+                namesEl.innerHTML = data.real_names
+                    .map(n => `<span class="inline-block bg-green-50 text-green-700 border border-green-200 rounded-full px-3 py-1 text-xs">${_escapeVp(n)}</span>`)
+                    .join('');
+            } else {
+                namesEl.innerHTML = '<span class="text-xs text-gray-400">还没有真实互动昵称，等待观众发弹幕 / 进场…</span>';
+            }
+            const fb = data.fallback_names || [];
+            document.getElementById('viewerPoolFallback').innerHTML = fb.length
+                ? `兜底名称池（${fb.length}，仅真实池为空时用于点名）：${fb.map(n => _escapeVp(n)).join('、')}`
+                : '兜底名称池：空（可在「配置管理」标签添加）';
+        } catch (e) {
+            document.getElementById('viewerPoolStats').innerHTML = `<span class="text-red-400">加载失败：${e.message}</span>`;
+        }
+    }
+
+    function startViewerPoolPoll() {
+        stopViewerPoolPoll();
+        loadViewerPool();
+        const auto = document.getElementById('viewerPoolAuto');
+        if (auto && auto.checked) {
+            _viewerPoolTimer = setInterval(loadViewerPool, 3000);
+        }
+    }
+
+    function stopViewerPoolPoll() {
+        if (_viewerPoolTimer) { clearInterval(_viewerPoolTimer); _viewerPoolTimer = null; }
+    }
+
+    function toggleViewerPoolPoll() {
+        const auto = document.getElementById('viewerPoolAuto');
+        if (auto && auto.checked) {
+            if (!_viewerPoolTimer) _viewerPoolTimer = setInterval(loadViewerPool, 3000);
+        } else {
+            stopViewerPoolPoll();
+        }
+    }
+
+    async function clearViewerPool() {
+        if (!confirm('确定清空真实互动昵称池？（不影响兜底名称池）')) return;
+        try {
+            await api('POST', '/api/config/viewer-pool/clear');
+            toast('真实互动昵称池已清空', 'success');
+            loadViewerPool();
+        } catch (e) { toast(e.message, 'error'); }
+    }
+
+    // ===== 成本 / 用量监控（监控看板，可自动轮询）=====
+    let _usageTimer = null;
+
+    async function loadUsage() {
+        try {
+            const d = await api('GET', '/api/monitor/usage');
+            document.getElementById('usageElapsed').textContent = d.elapsed_text || '-';
+            document.getElementById('usageTtsChars').textContent = (d.tts.billing_chars || 0).toLocaleString();
+            const llmTokens = (d.llm.input_tokens || 0) + (d.llm.output_tokens || 0);
+            document.getElementById('usageLlm').textContent = `${d.llm.calls || 0} 次 / ${llmTokens.toLocaleString()}`;
+            document.getElementById('usageTotal').textContent = `¥${(d.total_cost || 0).toFixed(3)}`;
+            document.getElementById('usageSummary').innerHTML =
+                `TTS 费用 <span class="font-medium text-gray-700">¥${(d.tts.cost || 0).toFixed(3)}</span>` +
+                `　·　LLM 费用 <span class="font-medium text-gray-700">¥${(d.llm.cost || 0).toFixed(3)}</span>`;
+            const prov = d.tts.by_provider || {};
+            const keys = Object.keys(prov);
+            document.getElementById('usageDetail').innerHTML = keys.length
+                ? '分供应商　' + keys.map(k =>
+                    `${k}：${prov[k].calls} 次 / ${prov[k].billing_chars.toLocaleString()} 字符 / ¥${prov[k].cost.toFixed(3)}`
+                  ).join('　·　')
+                : '还没有 TTS / LLM 调用，开启循环口播或触发弹幕问答后开始累计。';
+            document.getElementById('usageProject').innerHTML =
+                `当前 <b>¥${(d.cost_per_hour || 0).toFixed(2)}/小时</b>，按此速率预计 8 小时约 ` +
+                `<b class="text-green-600">¥${(d.projected_8h_cost || 0).toFixed(1)}</b>`;
+        } catch (e) {
+            document.getElementById('usageSummary').innerHTML = `<span class="text-red-400">加载失败：${e.message}</span>`;
+        }
+    }
+
+    function startUsagePoll() {
+        stopUsagePoll();
+        loadUsage();
+        const auto = document.getElementById('usageAuto');
+        if (auto && auto.checked) _usageTimer = setInterval(loadUsage, 5000);
+    }
+
+    function stopUsagePoll() {
+        if (_usageTimer) { clearInterval(_usageTimer); _usageTimer = null; }
+    }
+
+    function toggleUsagePoll() {
+        const auto = document.getElementById('usageAuto');
+        if (auto && auto.checked) { if (!_usageTimer) _usageTimer = setInterval(loadUsage, 5000); }
+        else stopUsagePoll();
+    }
+
+    async function resetUsage() {
+        if (!confirm('确定清零用量与成本统计？（重新开始累计）')) return;
+        try {
+            await api('POST', '/api/monitor/usage/reset');
+            toast('用量统计已清零', 'success');
+            loadUsage();
+        } catch (e) { toast(e.message, 'error'); }
+    }
+
     async function updateStatus() {
         try {
             const data = await api('GET', '/api/live/status');
@@ -1243,6 +1883,9 @@
     // 初始化
     updateStatus();
     setInterval(updateStatus, 5000);
+    // 直播控制是默认 tab，直接拉一次 OBS 状态并开启轮询
+    loadObsStatus();
+    startObsPoll();
     // 加载初始 provider 状态
     api('GET', '/api/config/tts').then(data => {
         currentProvider = data.provider || 'minimax';

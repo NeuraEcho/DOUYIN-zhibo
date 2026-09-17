@@ -127,10 +127,12 @@ async def speech_28_turbo_call(state: LiveState) -> dict:
     adapter = create_tts_adapter()  # 通过工厂创建适配器
 
     # 决策4：直播链路音色由全局运行时配置决定 —— 应用试播/提问或配置页选定的克隆音色。
-    # preview_router 触发前已 set_cloned_voice 写入运行时配置；此处读取并令火山适配器生效，
+    # preview_router 触发前已 set_cloned_voice 写入运行时配置；此处读取并令适配器生效，
     # 否则直播合成始终用 .env 预置音色，前端所选音色对直播链路不生效。
+    # 适用于火山引擎与 ElevenLabs（两者都是音色 ID 直接透传给厂商 API）；
+    # MiniMax 的音色在 create_tts_adapter 时已从配置读取，不走这个运行时槽位。
     from web.routers.config_router import get_cloned_voice_id, get_tts_provider
-    if get_tts_provider() == "volcengine":
+    if get_tts_provider() in ("volcengine", "elevenlabs"):
         _cloned = get_cloned_voice_id()
         if _cloned:
             adapter.set_cloned_voice(_cloned)

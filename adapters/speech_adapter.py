@@ -90,6 +90,10 @@ class Speech28TurboAdapter(BaseTTSAdapter):
         audio_chunks: list[bytes] = []
         active_voice = self._get_active_voice()
 
+        # 用量统计：MiniMax 按字符计费（官方规则 1 汉字=2 字符），埋点覆盖所有 TTS 调用路径
+        from scheduler.usage_tracker import UsageTracker
+        UsageTracker.get_instance().record_tts("minimax", text)
+
         # MiniMax T2A v2 原生请求格式（真人感优化参数）
         active_speed = self._get_active_speed()
         request_body = {

@@ -25,7 +25,10 @@ class DanmakuCollector:
     - 将弹幕消息封装为 LiveEvent 推送到事件总线
     - 支持断线重连（指数退避）
     - 支持心跳保活
+    - 单例：前端改直播间号后触发 reconnect() 用新 room_id 重连
     """
+
+    _instance: Optional["DanmakuCollector"] = None
 
     def __init__(self):
         self._ws_url = settings.live_room.platform_ws_url
@@ -41,10 +44,16 @@ class DanmakuCollector:
         self._heartbeat_interval: float = 30.0
         self._heartbeat_task: Optional[asyncio.Task] = None
 
+    @classmethod
+    def get_instance(cls) -> "DanmakuCollector":
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
     async def start(self):
         """启动弹幕监听（含断线重连）"""
         self._running = True
-        logger.info(f"[DanmakuCollector] 启动弹幕监听, room_id={self._room_id}")
+        logger.info(f"[DanmakuCollector] 启动弹幕监听, room_id={self._current_room_id()}")
 
         while self._running:
             try:
@@ -101,19 +110,43 @@ class DanmakuCollector:
             await self._ws.close()
         logger.info("[DanmakuCollector] 弹幕监听已停止")
 
+    async def reconnect(self):
+        """主动断开当前连接，触发用最新 room_id 重连（前端改直播间号后调用）。
+
+        start() 的连接循环在 ws 关闭后会重新调用 _build_ws_url() 取最新 room_id，
+        这里重置退避计数让重连尽快发生（无需等指数退避）。
+        """
+        self._reconnect_attempt = 0  # 重置退避计数，尽快重连
+        if self._ws:
+            try:
+                await self._ws.close()
+            except Exception as e:
+                logger.warning(f"[DanmakuCollector] 关闭旧连接异常: {type(e).__name__}: {e}")
+        logger.info(f"[DanmakuCollector] 已触发重连，将使用最新 room_id={self._current_room_id()}")
+
+    def _current_room_id(self) -> str:
+        """当前生效的直播间号：优先前端运行时覆盖值（config_router），否则用 .env 默认。"""
+        try:
+            from web.routers.config_router import get_room_id
+            return (get_room_id() or self._room_id or "").strip()
+        except Exception:
+            return (self._room_id or "").strip()
+
     def _build_ws_url(self) -> str:
         """构造 douyinLive 本地服务的 WebSocket 连接地址。
 
         douyinLive 的房间号从 URL 路径提取：ws://host:port/ws/<roomID>。
         - 若 platform_ws_url 已包含 /ws/ 路径，视为完整地址直接使用；
         - 否则用 room_id 拼接为 {base}/ws/{room_id}，便于只改 ROOM_ID 换直播间。
+        room_id 每次连接动态读取，故前端改直播间号 + reconnect() 即可换房间。
         """
         base = (self._ws_url or "").strip()
         if not base:
             return ""
-        if "/ws/" in base or not self._room_id:
+        room_id = self._current_room_id()
+        if "/ws/" in base or not room_id:
             return base
-        return f"{base.rstrip('/')}/ws/{self._room_id}"
+        return f"{base.rstrip('/')}/ws/{room_id}"
 
     async def _handle_message(self, raw_message: str):
         """处理 douyinLive 本地弹幕服务推送的消息。

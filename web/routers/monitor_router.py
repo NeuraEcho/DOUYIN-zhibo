@@ -41,3 +41,22 @@ async def health_check():
         "status": "healthy",
         "service": "AI 云端口播直播系统",
     }
+
+
+@router.get("/usage")
+async def get_usage():
+    """获取实时用量与成本统计（TTS 字符 / LLM token / 估算费用），供前端成本看板轮询"""
+    from scheduler.usage_tracker import UsageTracker
+    return UsageTracker.get_instance().get_usage()
+
+
+@router.post("/usage/reset")
+async def reset_usage():
+    """清零用量与成本统计（重新开始累计）"""
+    from scheduler.usage_tracker import UsageTracker
+    UsageTracker.get_instance().reset()
+    return {
+        "status": "ok",
+        "message": "用量统计已清零",
+        "data": UsageTracker.get_instance().get_usage(),
+    }

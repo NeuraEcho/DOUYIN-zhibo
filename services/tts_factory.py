@@ -1,6 +1,6 @@
 """
 TTS 适配器工厂 - 根据运行时配置动态创建 TTS 适配器实例
-支持 MiniMax Speech-2.8 和 火山引擎 Seed-TTS 两种提供商
+支持 MiniMax Speech-2.8、火山引擎 Seed-TTS、ElevenLabs 三种提供商
 """
 
 from loguru import logger
@@ -25,6 +25,10 @@ def create_tts_adapter(provider: str = None) -> BaseTTSAdapter:
         from adapters.volcengine_tts_adapter import VolcengineTTSAdapter
         logger.debug("[TTS Factory] 创建火山引擎 TTS 适配器")
         return VolcengineTTSAdapter()
+    elif provider == "elevenlabs":
+        from adapters.elevenlabs_tts_adapter import ElevenLabsTTSAdapter
+        logger.debug("[TTS Factory] 创建 ElevenLabs TTS 适配器")
+        return ElevenLabsTTSAdapter()
     else:
         from adapters.speech_adapter import Speech28TurboAdapter
         logger.debug("[TTS Factory] 创建 MiniMax TTS 适配器")

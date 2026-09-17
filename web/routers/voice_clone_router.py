@@ -44,6 +44,11 @@ class VolcCloneUseRequest(BaseModel):
     speaker_id: str
 
 
+class ElevenLabsUseRequest(BaseModel):
+    """设置当前使用的 ElevenLabs 音色"""
+    voice_id: str
+
+
 # ---------- API 接口 ----------
 
 @router.post("/upload-clone-audio")
@@ -134,6 +139,10 @@ async def list_system_voices():
         # 火山引擎：动态从 API 获取音色列表
         from services.volcengine_voice_service import get_volcengine_voices
         voices = await get_volcengine_voices()
+    elif provider == "elevenlabs":
+        # ElevenLabs：在线拉账号可用音色（含官网创建的克隆音色），不可达时回退静态兜底表
+        from services.elevenlabs_voice_service import get_elevenlabs_voices
+        voices = await get_elevenlabs_voices()
     else:
         # MiniMax：使用本地静态文件
         from data.system_voices import get_all_system_voices
@@ -259,3 +268,45 @@ async def use_volc_cloned_voice(request: VolcCloneUseRequest):
         "message": f"已切换到复刻音色: {voice.get('name')}",
         "speaker_id": request.speaker_id,
     }
+
+
+# ============================================================
+# ElevenLabs 音色 / 模型浏览
+# 克隆不在本项目内做：Instant Voice Cloning 需把音频上传到境外第三方，
+# 且涉及声音授权合规，统一在 elevenlabs.io 官网完成；克隆好的音色会自动出现在下面列表里。
+# ============================================================
+
+@router.get("/elevenlabs/voices")
+async def list_elevenlabs_voices(refresh: bool = False):
+    """在线拉取 ElevenLabs 账号下全部可用音色（预置 + 官网创建的克隆音色）
+
+    接口不可达时自动回退到静态兜底表，不会抛 500。
+    """
+    from services.elevenlabs_voice_service import get_elevenlabs_voices
+    voices = await get_elevenlabs_voices(refresh)
+    return {"voices": voices, "total": sum(len(v) for v in voices.values())}
+
+
+@router.get("/elevenlabs/models")
+async def list_elevenlabs_models(refresh: bool = False):
+    """列出账号可用的 TTS 模型（确认套餐是否支持所选 model_id、是否支持中文）
+
+    选错 model_id 是 ElevenLabs 返回 422 的首要原因，故把它做成可选列表而不是手填。
+    """
+    from services.elevenlabs_voice_service import get_elevenlabs_models
+    models = await get_elevenlabs_models(refresh)
+    return {"models": models, "total": len(models)}
+
+
+@router.post("/elevenlabs/use")
+async def use_elevenlabs_voice(request: ElevenLabsUseRequest):
+    """设置当前 TTS 使用的 ElevenLabs 音色（写入全局运行时配置，对直播链路生效）"""
+    from web.routers.config_router import set_cloned_voice
+
+    voice_id = (request.voice_id or "").strip()
+    if not voice_id:
+        raise HTTPException(status_code=400, detail="voice_id 不能为空")
+
+    set_cloned_voice(voice_id)
+    logger.info(f"[voice_clone] 已切换 ElevenLabs 音色: {voice_id}")
+    return {"status": "ok", "message": f"已切换音色: {voice_id}", "voice_id": voice_id}

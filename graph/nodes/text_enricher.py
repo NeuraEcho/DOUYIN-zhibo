@@ -15,14 +15,16 @@ async def text_enricher(state: LiveState) -> dict:
     - MiniMax：LLM 口语化改写 + 语气词标签
     - 火山引擎：直接使用原始稿件，不做任何 Agent 改写；
                 整体语气/情绪由适配器在会话级通过 context_texts（前端可填）全局控制
+    - ElevenLabs：同样直接使用原始稿件。口语化标注会注入 MiniMax 专属的
+                (breath)/(chuckle)/(sighs) 标签，ElevenLabs 不识别这些标签，会当正文念出来
     - 弹幕回复：跳过标注，减少延迟，避免情绪标签混入快速问答
     """
     from web.routers.config_router import get_tts_provider
     provider = get_tts_provider()
 
-    # ===== 火山引擎：直接用稿子，不经过 Agent 口语化 =====
-    if provider == "volcengine":
-        logger.info("[text_enricher] 火山引擎：直接使用原始稿件合成，跳过 Agent 口语化")
+    # ===== 火山引擎 / ElevenLabs：直接用稿子，不经过 Agent 口语化 =====
+    if provider in ("volcengine", "elevenlabs"):
+        logger.info(f"[text_enricher] {provider}：直接使用原始稿件合成，跳过 Agent 口语化")
         return {}
 
     # ===== 弹幕回复：跳过标注，减少延迟，避免 MiniMax 情绪标签混入 =====

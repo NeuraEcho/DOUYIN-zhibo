@@ -58,8 +58,8 @@ async def main():
 
     # 创建所有协程任务
     tasks = [
-        # 弹幕监听
-        asyncio.create_task(DanmakuCollector().start(), name="danmaku_collector"),
+        # 弹幕监听（单例：前端改直播间号后可触发同一实例 reconnect 用新房间号重连）
+        asyncio.create_task(DanmakuCollector.get_instance().start(), name="danmaku_collector"),
         # 定时任务（已禁用：不再自动定时播报，改为 Web 后台手动触发的「循环口播」）
         # 如需恢复定时播报，取消下面这行注释即可
         # asyncio.create_task(TimerCollector().start(), name="timer_collector"),
@@ -70,7 +70,26 @@ async def main():
     ]
 
     logger.info(f"所有服务协程已启动, 共 {len(tasks)} 个任务")
-    logger.info(f"Web 管理后台: http://{settings.web.host}:{settings.web.port}")
+    # 打印可点击的访问地址：0.0.0.0/:: 是「监听所有网卡」的绑定地址，不能作为浏览器访问目标
+    # （Windows 上照着 0.0.0.0 点会打不开），故本机访问统一显示 127.0.0.1，并附带局域网访问提示。
+    _host, _port = settings.web.host, settings.web.port
+    if _host in ("0.0.0.0", "::", ""):
+        logger.info(f"Web 管理后台（本机访问）: http://127.0.0.1:{_port}")
+        try:
+            import socket
+            _s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            _s.settimeout(0.5)
+            _s.connect(("8.8.8.8", 80))  # UDP connect 不会真正发包，仅用于拿到出口网卡内网 IP
+            _lan_ip = _s.getsockname()[0]
+            _s.close()
+        except Exception:
+            _lan_ip = ""
+        if _lan_ip:
+            logger.info(f"Web 管理后台（局域网其他设备）: http://{_lan_ip}:{_port}")
+        else:
+            logger.info(f"Web 管理后台（局域网其他设备）: http://<本机内网IP>:{_port}（用 ipconfig 查 IPv4 地址）")
+    else:
+        logger.info(f"Web 管理后台: http://{_host}:{_port}")
 
     # 启动 Web 服务（阻塞主线程）
     config = uvicorn.Config(
@@ -103,6 +122,7 @@ async def _event_loop(event_bus, session_manager, interrupt_controller):
     """
     from scheduler.event_bus import EventType
     from scheduler.danmaku_filter import DanmakuFilter
+    from web.routers.config_router import get_room_id
 
     danmaku_filter = DanmakuFilter.get_instance()
     logger.info("[event_loop] 事件消费循环启动")
@@ -139,14 +159,14 @@ async def _event_loop(event_bus, session_manager, interrupt_controller):
                 else:
                     # 问答进行中（DANMAKU_REPLY）或空闲 → 即时打断/即时回答（保留原有行为）
                     await session_manager.start_session(
-                        thread_id=settings.live_room.room_id or "default",
+                        thread_id=get_room_id() or "default",
                         event=event,
                     )
 
             else:
                 # 普通事件（定时播报、手动下发等）→ 会话管理器启动新会话
                 await session_manager.start_session(
-                    thread_id=settings.live_room.room_id or "default",
+                    thread_id=get_room_id() or "default",
                     event=event,
                 )
 

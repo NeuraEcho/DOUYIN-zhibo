@@ -240,9 +240,9 @@ class StreamingPipeline:
         session_manager.register_adapter(adapter)
 
         try:
-            # 应用克隆音色
+            # 应用克隆音色（火山引擎 / ElevenLabs：音色 ID 直接透传给厂商 API）
             from web.routers.config_router import get_cloned_voice_id, get_tts_provider
-            if get_tts_provider() == "volcengine":
+            if get_tts_provider() in ("volcengine", "elevenlabs"):
                 cloned_voice = get_cloned_voice_id()
                 if cloned_voice:
                     adapter.set_cloned_voice(cloned_voice)

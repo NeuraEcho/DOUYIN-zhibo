@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from loguru import logger
 
-from web.routers import config_router, control_router, monitor_router, voice_clone_router, preview_router, tts_debug_router
+from web.routers import config_router, control_router, monitor_router, voice_clone_router, preview_router, tts_debug_router, channels_router, obs_router
 
 _STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
@@ -38,7 +38,10 @@ def create_app() -> FastAPI:
     app.include_router(monitor_router.router, prefix="/api/monitor", tags=["实时监控"])
     app.include_router(voice_clone_router.router, prefix="/api/voice-clone", tags=["音色克隆"])
     app.include_router(preview_router.router, prefix="/api/preview", tags=["试听试播"])
+    app.include_router(obs_router.router, prefix="/api/obs", tags=["OBS 推流控制"])
     app.include_router(tts_debug_router.router, prefix="", tags=["TTS调试工具"])
+    # 视频号弹幕接收（对接 wxlivespy 转发）：根路径 /forward 命中其默认转发地址，零配置
+    app.include_router(channels_router.router, prefix="", tags=["视频号弹幕接收"])
 
     # 静态文件 & 首页
     if _STATIC_DIR.exists():
